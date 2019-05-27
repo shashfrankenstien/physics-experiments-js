@@ -64,7 +64,7 @@ class Ball {
 		this.prev_x = {}
 		this.exp_x = {
 			f: 0.96,
-			v: getRandomBetween(0, 100) - 25,
+			v: getRandomBetween(0, 50) - 25,
 			vd: 1,
 		}
 		this.beeper = new sound('beep.wav')
@@ -137,7 +137,7 @@ class Ball {
 		} else if (this.x-this.r < 0) {
 			this.exp_x.vd *= -1
 			this.x = this.r
-		}
+		} 
 		return this.x + (this.exp_x.v * this.exp_x.vd)
 		// return this.x + (this.exp_x.v * this.bounciness * this.exp_x.vd)
 	}
@@ -147,9 +147,24 @@ class Ball {
 	check_obstacle() {
 		var t = this
 		t.obstacles.static.forEach(s=>{
-			if (this.y >= s.obj.y1 && this.y <= s.obj.y2) {
-				console.log("XXXXXXXXX")
+			const inHorizontalBand = this.y >= s.obj.y1 && this.y <= s.obj.y2
+			const  inVerticalBand = this.x >= s.obj.x1 && this.x <= s.obj.x2
+
+			if (inVerticalBand) {
+
+				if (this.prev_y.y < this.y && (this.y+this.r) > s.obj.y1 && this.y < s.obj.y2) {
+					console.log("click")
+					this.bounce_y(this.yToMeters(s.obj.y1 - this.r))
+				} else if (this.prev_y.y > this.y && (this.y-this.r) < s.obj.y2 && this.y > s.obj.y1)  {
+					console.log("kick")
+					this.bounce_y(this.yToMeters(s.obj.y2 + this.r))
+					
+				}
+			}
+
+			else if (inHorizontalBand) {
 				if (this.prev_x.x < this.x && (this.x+this.r) > s.obj.x1 && this.x < s.obj.x2) {
+					console.log("<<<")
 					this.exp_x.vd *= -1
 					this.x = s.obj.x1 - this.r
 				} else if (this.prev_x.x > this.x && (this.x-this.r) < s.obj.x2 && this.x > s.obj.x1) {
@@ -158,36 +173,13 @@ class Ball {
 				}
 			} 
 
-			else if (this.x+this.r >= s.obj.x1 && this.x-this.r <= s.obj.x2) {
-				console.log("YYY yy y yy yy ")
-				// console.log(this.y)
-				var y_vd = this.exp_y.vd * (this.exp_y.v/Math.abs(this.exp_y.v))
-				
-
-				if (this.prev_y.y < this.y && (this.y+this.r) > s.obj.y1 && this.y < s.obj.y2) {
-					console.log("click")
-					this.bounce_y(this.yToMeters(s.obj.y1 - this.r))
-					// this.exp_y.vd *= -1
-					// this.exp_y.v *= this.bounciness
-					// this.exp_y.h = this.yToMeters(s.obj.y1 - this.r)
-				} else if (this.prev_y.y > this.y && (this.y-this.r) < s.obj.y2 && this.y > s.obj.y1)  {
-					console.log("kick")
-					this.bounce_y(this.yToMeters(s.obj.y2 + this.r))
-					
-				}
-			}
+			
 		})
+		return [this.x + (this.exp_x.v * this.exp_x.vd), this.metersToY(this.exp_y.h)]
 	}
 
 
 	move_next(canvas) {
-
-		// this.check_obstacle()
-
-		this.check_obstacle()
-		this.y = this.ex_props_y()
-		this.x = this.ex_props_x()
-
 
 		canvas.save()
 		var grd = canvas.createRadialGradient(this.x, this.y, this.r/50, this.x, this.y+this.r, 3*this.r);
@@ -199,6 +191,12 @@ class Ball {
 		canvas.arc(this.x, this.y, this.r, 0, 2*Math.PI);
 		canvas.fill(); 
 		canvas.restore()
+
+		this.y = this.ex_props_y()
+		this.x = this.ex_props_x()
+		var r = this.check_obstacle()
+		this.x = r[0]
+		this.y = r[1]
 
 		if (!(this.exp_x.v==0 && this.exp_y.v==0)) {
 			return true
@@ -233,44 +231,9 @@ class Environment {
 		var t = this
 		var blk = {x1, y1, x2, y2}
 		blk.draw = ()=>{
-			t.canvas.strokeStyle = "grey";
-			// t.canvas.fillRect(x1, y1, x2, y2);
-			t.canvas.strokeRect(x1, y1, x2-x1, y2-y1);
-			t.canvas.beginPath();
-			t.canvas.arc(x1, y1, 10, 0, 2*Math.PI);
-			t.canvas.stroke(); 
-			t.canvas.beginPath();
-			t.canvas.arc(x2, y2, 10, 0, 2*Math.PI);
-			t.canvas.stroke();
+			t.canvas.fillStyle = "grey";
+			t.canvas.fillRect(x1, y1, x2-x1, y2-y1);
 		}
-		// blk.contact = (x, y)=>{
-		// 	if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
-		// 		const dx1 = x-x1
-		// 		const dx2 = x2-x
-		// 		const dy1 = y-y1
-		// 		const dy2 = y2-y
-		// 		const m = Math.min(dx1, dx2, dy1, dy2)
-		// 		console.log("================")
-		// 		console.log(x1, y1, x2, y2)
-		// 		console.log(x, y)
-		// 		if (m===dx1) {
-		// 			console.log("Vertical")
-		// 			return {x:x1, y:y, bx:-1, by:1}
-		// 		} else if (m===dx2) {
-		// 			console.log("Vertical")
-		// 			return {x:x2, y:y, bx:-1, by:1}
-		// 		} else if (m===dy1) {
-		// 			console.log("Horizontal")
-		// 			return {x:x, y:y1, bx:1, by:-1}
-		// 		} else {
-		// 			console.log("Horizontal")
-		// 			return {x:x, y:y2, bx:1, by:-1}
-		// 		}
-		// 	} else {
-		// 		// console.log(x1, x, x2, y1, y, y2)
-		// 		return null
-		// 	}
-		// }
 		this.properties.static.push({type: 'block', obj: blk})
 	}
 	
@@ -278,25 +241,25 @@ class Environment {
 		this.canvas.clearRect(0, 0, this.canvas_elem.width, this.canvas_elem.height)
 		this.properties.static.forEach(s=>s.obj.draw())
 		this.balls.forEach((b)=>b.move_next(this.canvas))
-		// this.balls[0].ex_props()
-		setTimeout(()=>this.show(), 40)
+		setTimeout(()=>this.show(), 30)
 	}
 }
 
-// var b = new Ball(50, 40)
-// b.bounce()
+
+
+
 
 var e = new Environment()
 
-// e.addBlock(window.innerWidth-700, window.innerHeight-200, window.innerWidth-300, window.innerHeight)
-// e.addBlock(300, 300, 400, 500)
+e.addBlock(100, window.innerHeight-300, window.innerWidth-400, window.innerHeight-100)
+e.addBlock(300, 300, 400, 500)
 
 var r = ()=>getRandomBetween(50, window.innerHeight -50)
 e.addBall(50, 50)
 e.addBall(r(), r(), getRandomBetween(10, 80), "red")
-e.addBall(r(), r(), getRandomBetween(10, 80), "green")
-e.addBall(r(), r(), getRandomBetween(10, 80), "grey")
-e.addBall(r(), r())
+// e.addBall(r(), r(), getRandomBetween(10, 80), "green")
+// e.addBall(r(), r(), getRandomBetween(10, 80), "grey")
+// e.addBall(r(), r())
 // e.addBall(r(), r(), getRandomBetween(10, 80), "purple")
 // e.addBall(r(), r(), getRandomBetween(10, 80), "green")
 // e.addBall(r(), r(), getRandomBetween(10, 80), "grey")
