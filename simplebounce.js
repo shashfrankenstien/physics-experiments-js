@@ -64,7 +64,7 @@ class Ball {
 		this.prev_x = {}
 		this.exp_x = {
 			f: 0.98,
-			v: 1,//getRandomBetween(0, 100) - 25,
+			v: getRandomBetween(0, 100) - 25,
 			vd: 1,
 		}
 		this.beeper = new sound('beep.wav')
