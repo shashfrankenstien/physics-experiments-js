@@ -5,8 +5,11 @@
 	canvas_elem.id = "canvas"
 	canvas_elem.width = window.innerWidth
 	canvas_elem.height = window.innerHeight
-})()
 
+	// var audioCtx = new AudioContext();
+	// var offlineCtx = new OfflineAudioContext(2,44100*40,44100);
+
+})()
 
 
 function isEmpty(obj) {
@@ -40,8 +43,20 @@ function sound(src) {
 	this.stop = function(){
 		this.sound.pause();
 	}
-} 
+}
 
+
+
+
+function playSound(n) {
+	var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	var o = audioCtx.createOscillator()
+	o.type = "triangle"
+	o.frequency.setValueAtTime(NOTES[n], audioCtx.currentTime)
+	o.connect(audioCtx.destination)
+	o.start()
+	o.stop(0.1)
+}
 
 
 
@@ -51,8 +66,9 @@ class Ball {
 		this.r = radius
 		this.c = color
 		this.obstacles = environ_props
-		this.starting_height = start_y
-		
+		this.start_x = start_x
+		this.start_y = start_y
+
 		this.x = start_x
 		this.y = start_y
 
@@ -60,14 +76,16 @@ class Ball {
 		this.bounciness = 0.9
 
 		this.prev_y = {}
-		this.exp_y = {}
+		this.next_y = {}
+
 		this.prev_x = {}
-		this.exp_x = {
-			f: 0.96,
-			v: getRandomBetween(0, 50) - 25,
-			vd: 1,
+		this.next_x = {}
+
+		this.scaled = {
+			viewWidth: this.xToMeters(this.obstacles.viewWidth),
+			radius: this.xToMeters(this.r)
 		}
-		this.beeper = new sound('beep.wav')
+		// this.beeper = new sound('beep.wav')
 	}
 
 	metersToY(m) {
@@ -80,68 +98,97 @@ class Ball {
 		return inverse / this.obstacles.viewHeight
 	}
 
+	xToMeters(x) {
+		return x / this.obstacles.viewHeight
+	}
 
-	bounce_y(at) {
-		this.exp_y.vd *= -1
-		this.exp_y.v *= this.bounciness
-		this.exp_y.h = at
-		
+	metersToX(m) {
+		return m * this.obstacles.viewHeight
+	}
+
+
+	bounce_y(at, obstacle_bounce) {
+		var o_bounce = obstacle_bounce ? obstacle_bounce : 1
+		this.next_y.vd *= -1
+		this.next_y.v *= this.bounciness * o_bounce
+		this.next_y.h = at
+
 		// Apply x-axis friction
-		this.exp_x.v *= this.exp_x.f
+		this.next_x.v *= this.next_x.f
 	}
 
 	ex_props_y() {
-		if (isEmpty(this.exp_y)) {
-			this.exp_y = {
+		if (isEmpty(this.next_y)) {
+			this.next_y = {
 				m: 1, //kgrams
 				g: 9.81, //m/s^2
-				h: this.yToMeters(this.starting_height), //meters
+				h: this.yToMeters(this.start_y), //meters
 				v: 0, //m/sec
 				st: new Date(),
 				dt: 0,
 				Ke:0,
 				vd: +1,
+				vect: 0,
 			}
-			this.exp_y.Pe = this.exp_y.m * this.exp_y.g * this.exp_y.h
+			// this.next_y.Pe = this.next_y.m * this.next_y.g * this.next_y.h
 		} else {
-			this.prev_y = copyObj(this.exp_y)
-			this.prev_y.y = this.y
+			this.prev_y = copyObj(this.next_y)
 
-			var st = new Date()
-			this.exp_y.dt = (st.getTime() - this.exp_y.st.getTime())/1000
-			this.exp_y.st = st
+			this.next_y.st = new Date()
+			this.next_y.dt = (this.next_y.st.getTime() - this.prev_y.st.getTime())/1000
 
-			this.exp_y.v += (this.exp_y.g * this.exp_y.dt * this.exp_y.vd)
-			this.exp_y.h -= ((this.exp_y.v/2) * this.exp_y.dt * this.exp_y.vd)
+			this.next_y.v += (this.next_y.g * this.next_y.dt * this.next_y.vd)
+			this.next_y.h -= ((this.next_y.v/2) * this.next_y.dt * this.next_y.vd)
 
-			this.exp_y.Ke = this.exp_y.m * (Math.pow(this.exp_y.v, 2))/2
-			this.exp_y.Pe = this.exp_y.m * this.exp_y.g * this.exp_y.h
+			// this.next_y.Ke = this.next_y.m * (Math.pow(this.next_y.v, 2))/2
+			// this.next_y.Pe = this.next_y.m * this.next_y.g * this.next_y.h
 
-			if (this.exp_y.h < 0) {
+			this.next_y.vect = this.next_y.h - this.prev_y.h
+
+			if (this.next_y.h < 0) {
 				// Handle bounce
 				this.bounce_y(0)
 			}
 		}
-		
-		// console.log(this.exp_y.Pe + this.exp_y.Ke)
-		return this.metersToY(this.exp_y.h)
+
+		// console.log(this.next_y.Pe + this.next_y.Ke)
+		this.next_y.y = this.metersToY(this.next_y.h)
+		return this.next_y.y
 	}
 
 	ex_props_x() {
-		this.prev_x = copyObj(this.exp_x)
-		this.prev_x.x = this.x
+		if (isEmpty(this.next_x)) {
+			this.next_x = {
+				f: 0.96,
+				v: 1, //m/s
+				h: this.xToMeters(this.start_x), //meters
+				vd: +1,
+				st: new Date(),
+				dt: 0,
+				vect: 0,
+			}
+			// this.next_y.Pe = this.next_y.m * this.next_y.g * this.next_y.h
+		} else {
+			this.prev_x = copyObj(this.next_x)
 
-		if (this.x+this.r > this.obstacles.viewWidth) {
-			this.exp_x.vd *= -1
-			this.x = this.obstacles.viewWidth - this.r
-		} else if (this.x-this.r < 0) {
-			this.exp_x.vd *= -1
-			this.x = this.r
-		} 
-		return this.x + (this.exp_x.v * this.exp_x.vd)
-		// return this.x + (this.exp_x.v * this.bounciness * this.exp_x.vd)
+			this.next_x.st = new Date()
+			this.next_x.dt = (this.next_x.st.getTime() - this.prev_x.st.getTime())/1000
+
+			this.next_x.vect = (this.next_x.v * this.next_x.dt * this.next_x.vd)
+			this.next_x.h += this.next_x.vect
+
+			if ((this.next_x.h + this.scaled.radius) > this.scaled.viewWidth) {
+				this.next_x.vd *= -1
+				this.next_x.h = this.scaled.viewWidth - this.scaled.radius
+			} else if ((this.next_x.h - this.scaled.radius )< 0) {
+				this.next_x.vd *= -1
+				this.next_x.h = this.scaled.radius
+			}
+		}
+		this.next_x.x = this.metersToX(this.next_x.h)
+		// console.log(this.next_x.x )
+		return this.next_x.x
 	}
-
 
 
 	check_obstacle() {
@@ -154,28 +201,31 @@ class Ball {
 
 				if (this.prev_y.y < this.y && (this.y+this.r) > s.obj.y1 && this.y < s.obj.y2) {
 					console.log("click")
-					this.bounce_y(this.yToMeters(s.obj.y1 - this.r))
+					this.bounce_y(this.yToMeters(s.obj.y1 - this.r), s.bounce)
 				} else if (this.prev_y.y > this.y && (this.y-this.r) < s.obj.y2 && this.y > s.obj.y1)  {
 					console.log("kick")
-					this.bounce_y(this.yToMeters(s.obj.y2 + this.r))
-					
+					this.bounce_y(this.yToMeters(s.obj.y2 + this.r), s.bounce)
+
 				}
 			}
 
 			else if (inHorizontalBand) {
 				if (this.prev_x.x < this.x && (this.x+this.r) > s.obj.x1 && this.x < s.obj.x2) {
 					console.log("<<<")
-					this.exp_x.vd *= -1
+					// playSound("A5")
+					this.next_x.vd *= -1
 					this.x = s.obj.x1 - this.r
 				} else if (this.prev_x.x > this.x && (this.x-this.r) < s.obj.x2 && this.x > s.obj.x1) {
-					this.exp_x.vd *= -1
+					console.log(">>>")
+					// playSound("B5")
+					this.next_x.vd *= -1
 					this.x = s.obj.x2 + this.r
 				}
-			} 
+			}
 
-			
+
 		})
-		return [this.x + (this.exp_x.v * this.exp_x.vd), this.metersToY(this.exp_y.h)]
+		return [this.x + (this.next_x.v * this.next_x.vd), this.metersToY(this.next_y.h)]
 	}
 
 
@@ -189,7 +239,7 @@ class Ball {
 
 		canvas.beginPath();
 		canvas.arc(this.x, this.y, this.r, 0, 2*Math.PI);
-		canvas.fill(); 
+		canvas.fill();
 		canvas.restore()
 
 		this.y = this.ex_props_y()
@@ -198,11 +248,41 @@ class Ball {
 		this.x = r[0]
 		this.y = r[1]
 
-		if (!(this.exp_x.v==0 && this.exp_y.v==0)) {
+		if (!(this.next_x.v==0 && this.next_y.v==0)) {
 			return true
 		} else {
 			return false
 		}
+	}
+}
+
+
+class Block {
+	constructor(canvas, x, y, width, height, color, bounce) {
+		this.color = color ? color : "grey"
+		this.bounce = bounce ? bounce : 1
+		this.obj = {
+			x1:x,
+			y1:y,
+			x2:x+width,
+			y2:y+height,
+			w:width,
+			h:height,
+		}
+		this.canvas = canvas
+	}
+
+	draw() {
+		this.canvas.fillStyle = this.color;
+		this.canvas.fillRect(this.obj.x1, this.obj.y1, this.obj.w, this.obj.h);
+	}
+}
+
+
+class Trampoline extends Block {
+	constructor(canvas, x, width, bounce) {
+		var h = canvas.canvas.height
+		super(canvas, x, h-5, width, 5, "red", bounce)
 	}
 }
 
@@ -227,19 +307,18 @@ class Environment {
 	}
 
 	addBlock(x1, y1, x2, y2, bounce) {
-		var bounce = bounce ? bounce : 1
-		var t = this
-		var blk = {x1, y1, x2, y2}
-		blk.draw = ()=>{
-			t.canvas.fillStyle = "grey";
-			t.canvas.fillRect(x1, y1, x2-x1, y2-y1);
-		}
-		this.properties.static.push({type: 'block', obj: blk})
+		var blk = new Block(this.canvas, x1, y1, x2-x1, y2-y1)
+		this.properties.static.push(blk)
 	}
-	
+
+	addTrampoline(x, w, bounce) {
+		var blk = new Trampoline(this.canvas, x, w, bounce)
+		this.properties.static.push(blk)
+	}
+
 	show() {
 		this.canvas.clearRect(0, 0, this.canvas_elem.width, this.canvas_elem.height)
-		this.properties.static.forEach(s=>s.obj.draw())
+		this.properties.static.forEach(s=>s.draw())
 		this.balls.forEach((b)=>b.move_next(this.canvas))
 		setTimeout(()=>this.show(), 30)
 	}
@@ -251,13 +330,15 @@ class Environment {
 
 var e = new Environment()
 
-e.addBlock(100, window.innerHeight-300, window.innerWidth-400, window.innerHeight-100)
-e.addBlock(300, 300, 400, 500)
+e.addBlock(400, window.innerHeight-300, window.innerWidth-400, window.innerHeight-150)
+// e.addBlock(550, 300, window.innerWidth-550, 400)
+e.addTrampoline(50, 200, 1.5)
+e.addTrampoline(window.innerWidth-250, 200, 1.5)
 
 var r = ()=>getRandomBetween(50, window.innerHeight -50)
-e.addBall(50, 50)
+e.addBall(500, 100)
 e.addBall(r(), r(), getRandomBetween(10, 80), "red")
-// e.addBall(r(), r(), getRandomBetween(10, 80), "green")
+e.addBall(r(), r(), getRandomBetween(10, 80), "green")
 // e.addBall(r(), r(), getRandomBetween(10, 80), "grey")
 // e.addBall(r(), r())
 // e.addBall(r(), r(), getRandomBetween(10, 80), "purple")
