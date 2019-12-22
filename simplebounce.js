@@ -332,13 +332,17 @@ var e = new Environment()
 
 e.addBlock(400, window.innerHeight-300, window.innerWidth-400, window.innerHeight-150)
 // e.addBlock(550, 300, window.innerWidth-550, 400)
-e.addTrampoline(50, 200, 1.5)
-e.addTrampoline(window.innerWidth-250, 200, 1.5)
+
 
 var r = ()=>getRandomBetween(50, window.innerHeight -50)
 e.addBall(500, 100)
 e.addBall(r(), r(), getRandomBetween(10, 80), "red")
 e.addBall(r(), r(), getRandomBetween(10, 80), "green")
+
+
+e.addTrampoline(100, 120, 1.5)
+e.addTrampoline(window.innerWidth-300, 120, 1.5)
+
 // e.addBall(r(), r(), getRandomBetween(10, 80), "grey")
 // e.addBall(r(), r())
 // e.addBall(r(), r(), getRandomBetween(10, 80), "purple")
