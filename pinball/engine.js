@@ -27,10 +27,11 @@ class VelocityVector {
 
 	tilt(theta) {
 		var t = degToRadians(theta)
+		var nt = degToRadians(90-theta)
 		var Xx_vel = Math.cos(t) * this.x_vel
-		var Yx_vel = Math.sin(t) * this.x_vel
+		var Yx_vel = Math.cos(nt) * this.x_vel * -1
 
-		var Xy_vel = Math.sin(t) * this.y_vel
+		var Xy_vel = Math.cos(nt) * this.y_vel
 		var Yy_vel = Math.cos(t) * this.y_vel
 
 		return new VelocityVector(Xx_vel+Xy_vel, Yx_vel+Yy_vel)
