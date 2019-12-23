@@ -3,13 +3,13 @@
 	canvas_elem.id = "canvas"
 	canvas_elem.width = window.innerWidth
 	canvas_elem.height = window.innerHeight
-
 	// var audioCtx = new AudioContext();
 	// var offlineCtx = new OfflineAudioContext(2,44100*40,44100);
 
 })()
 
-var GT = null
+const SCALING = 70
+
 
 class Point {
 	constructor(x, y){
@@ -106,7 +106,7 @@ class Obstacle {
 				canvas.moveTo(this.points[i].x, this.points[i].y)
 			} else {
 				canvas.lineTo(this.points[i].x, this.points[i].y)
-				this.surfaces.push(new BasicPlane(this.points[i], this.points[i-1]))
+				this.surfaces.push(new BasicPlane(this.points[i], this.points[i-1], this.options.bounce || 0.9))
 			}
 		}
 
@@ -123,7 +123,7 @@ class Projectile {
 		this.center = center
 		this.nextCenter = center
 		this.color = color
-		this.velocity = new VelocityVector(80, 200)
+		this.velocity = new VelocityVector(2*SCALING, 200)
 		this.timestamp = new Date()
 	}
 
@@ -172,7 +172,7 @@ class Projectile {
 		var newstamp = new Date()
 		var timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
 		// apply gravity
-		this.velocity.y_vel += (9.81 * timedelta)
+		this.velocity.y_vel += (9.81 * timedelta * SCALING)
 		this.nextCenter = this.velocity.getNextPosition(this.center, timedelta)
 		// console.log(this.nextCenter)
 		props.forEach(p=>{
@@ -183,6 +183,8 @@ class Projectile {
 						console.log("Bang!!", this.nextCenter)
 						this.nextCenter = this._findCollisionPoint(line)
 						this.velocity = line.applyForce(this.velocity, i || 1)
+						this.velocity.x_vel *=0.9
+
 					}
 				})
 			}
@@ -232,13 +234,13 @@ class Environment {
 		// var loop_end = new Date()
 		// var diff = (loop_end.getTime() - loop_start.getTime())
 		// console.log(diff)
-		setTimeout(()=>this.runloop(), 30)
+		setTimeout(()=>this.runloop(), 15)
 	}
 }
 
 
 var e = new Environment()
-
+const trampoline_bounce = 1.3
 
 var o1 = new Obstacle([
 	new Point(0, window.innerHeight-300),
@@ -247,6 +249,7 @@ var o1 = new Obstacle([
 		strokeColor:'blue',
 		lineWidth: "5",
 		// fillColor: "grey"
+		bounce: trampoline_bounce,
 	}
 )
 
@@ -257,6 +260,7 @@ var o2 = new Obstacle([
 		strokeColor:'green',
 		lineWidth: "5",
 		// fillColor: "grey"
+		bounce: trampoline_bounce,
 	}
 )
 
@@ -267,6 +271,7 @@ var o3 = new Obstacle([
 		strokeColor:'green',
 		lineWidth: "5",
 		// fillColor: "grey"
+		bounce: trampoline_bounce,
 	}
 )
 
@@ -277,6 +282,7 @@ var o4 = new Obstacle([
 		strokeColor:'green',
 		lineWidth: "5",
 		// fillColor: "grey"
+		bounce: trampoline_bounce,
 	}
 )
 
