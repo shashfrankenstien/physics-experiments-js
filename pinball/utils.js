@@ -104,5 +104,5 @@ function doIntersect(p1, q1, p2, q2) {
 	if (o4 == 0 && onSegment(p2, q1, q2)) return o1
 
 	// return false // Doesn't fall in any of the above cases
-	throw new Error("no intersection")
+	return 404
 }

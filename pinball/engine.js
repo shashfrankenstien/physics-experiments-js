@@ -178,13 +178,11 @@ class Projectile {
 		props.forEach(p=>{
 			if (p instanceof Obstacle) {
 				p.surfaces.forEach(line=>{
-					try {
-						var i = doIntersect(this.center, this.nextCenter, line.p1, line.p2)
+					var i = doIntersect(this.center, this.nextCenter, line.p1, line.p2)
+					if (i!==404) {
 						console.log("Bang!!", this.nextCenter)
 						this.nextCenter = this._findCollisionPoint(line)
 						this.velocity = line.applyForce(this.velocity, i || 1)
-					} catch(e) {
-						// console.log(e)
 					}
 				})
 			}
@@ -232,7 +230,7 @@ class Environment {
 		this.properties.elements.forEach(s=>s.draw(this.canvas))
 		this.balls.forEach((b)=>b.draw(this.canvas, this.properties.elements))
 		// var loop_end = new Date()
-		// var diff = (loop_start.getTime() - loop_end.getTime())
+		// var diff = (loop_end.getTime() - loop_start.getTime())
 		// console.log(diff)
 		setTimeout(()=>this.runloop(), 30)
 	}
