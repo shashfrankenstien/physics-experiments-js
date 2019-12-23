@@ -27,11 +27,10 @@ class VelocityVector {
 
 	tilt(theta) {
 		var t = degToRadians(theta)
-		var nt = degToRadians(90-theta)
 		var Xx_vel = Math.cos(t) * this.x_vel
-		var Yx_vel = Math.cos(nt) * this.x_vel * -1
+		var Yx_vel = Math.sin(t) * this.x_vel * -1
 
-		var Xy_vel = Math.cos(nt) * this.y_vel
+		var Xy_vel = Math.sin(t) * this.y_vel
 		var Yy_vel = Math.cos(t) * this.y_vel
 
 		return new VelocityVector(Xx_vel+Xy_vel, Yx_vel+Yy_vel)
@@ -56,7 +55,7 @@ class LineSegment {
 		this.c = this.p1.y - (this.slope*this.p1.x)
 		this.angle = radiansToDeg(Math.atan(this.slope))
 		// console.log(this.slope, this.angle, this.c)
-		if (this.p2.y > this.p1.y) this.angle *= -1
+		// if (this.p2.y > this.p1.y) this.angle *= -1
 	}
 }
 
@@ -67,10 +66,10 @@ class BasicPlane extends LineSegment {
 	}
 
 	applyForce(to_vect, direction) {
-		var tmp = to_vect.tilt(this.angle*direction)
+		var tmp = to_vect.tilt(this.angle)
 		// reverse perpendicular component * bounce factor
 		tmp.y_vel *= (-1 * this.bounce)
-		var new_vect = tmp.tilt(-1*this.angle*direction)
+		var new_vect = tmp.tilt(-1*this.angle)
 		console.log(to_vect, tmp, new_vect, this.angle, direction)
 		return new_vect
 	}
@@ -141,10 +140,22 @@ class Projectile {
 		console.log("--------")
 		console.log(this.center, this.nextCenter)
 		console.log("--------")
-		for (var cx=this.center.x; cx<this.nextCenter.x; cx+=0.1){
+
+		var startx = this.center.x
+		var endx = this.nextCenter.x
+
+		if (startx < endx) {
+			var for_check = (x)=>x<endx
+			var next_step = (x)=>x+0.1
+		} else {
+			var for_check = (x)=>x>endx
+			var next_step = (x)=>x-0.1
+		}
+
+		for (var cx=this.center.x; for_check(cx); cx=next_step(cx)){
 			var cy = (path.slope * cx) + path.c
 			var r = new Point(cx, cy)
-			console.log(r)
+			console.log('r', r)
 			no = orientation(surface.p1, surface.p2, r)
 			if (co!==no) {
 				return new Point(px, py)
@@ -154,7 +165,7 @@ class Projectile {
 				py = cy
 			}
 		}
-		// return this.nextCenter
+		return this.nextCenter
 	}
 
 	computeNextPosition(props) {
@@ -169,10 +180,9 @@ class Projectile {
 				p.surfaces.forEach(line=>{
 					try {
 						var i = doIntersect(this.center, this.nextCenter, line.p1, line.p2)
-						console.log(i)
+						console.log("Bang!!", this.nextCenter)
 						this.nextCenter = this._findCollisionPoint(line)
 						this.velocity = line.applyForce(this.velocity, i || 1)
-						console.log("Bang!!")
 					} catch(e) {
 						// console.log(e)
 					}
@@ -183,12 +193,13 @@ class Projectile {
 		// console.log(this.timestamp)
 	}
 
-	draw(canvas) {
+	draw(canvas, props) {
 		canvas.lineWidth = "4"
 		canvas.strokeStyle = this.color
 		canvas.rect(this.nextCenter.x, this.nextCenter.y, 1, 1)
 		canvas.stroke()
 		this.center = this.nextCenter
+		this.computeNextPosition(props)
 		// canvas.fillStyle = this.color
 		// canvas.fillRect(this.center.x, this.center.y, 1, 1)
 	}
@@ -216,18 +227,20 @@ class Environment {
 	}
 
 	runloop() {
+		// var loop_start = new Date()
 		this.canvas.clearRect(0, 0, this.canvas_elem.width, this.canvas_elem.height)
 		this.properties.elements.forEach(s=>s.draw(this.canvas))
-		this.balls.forEach((b)=>b.draw(this.canvas))
-		this.balls.forEach((b)=>b.computeNextPosition(this.properties.elements))
-		GT = setTimeout(()=>this.runloop(), 30)
+		this.balls.forEach((b)=>b.draw(this.canvas, this.properties.elements))
+		// var loop_end = new Date()
+		// var diff = (loop_start.getTime() - loop_end.getTime())
+		// console.log(diff)
+		setTimeout(()=>this.runloop(), 30)
 	}
 }
 
 
 var e = new Environment()
 
-var ground = new Obstacle([new Point(0,window.innerHeight-20), new Point(window.innerWidth,window.innerHeight-20)], {})
 
 var o1 = new Obstacle([
 	new Point(0, window.innerHeight-300),
@@ -240,8 +253,8 @@ var o1 = new Obstacle([
 )
 
 var o2 = new Obstacle([
-	new Point(200, window.innerHeight-300),
-	new Point(500, window.innerHeight-20)],
+	new Point(window.innerWidth, window.innerHeight-300),
+	new Point(window.innerWidth-300, window.innerHeight-20)],
 	{
 		strokeColor:'green',
 		lineWidth: "5",
@@ -249,11 +262,46 @@ var o2 = new Obstacle([
 	}
 )
 
-var b = new Projectile(new Point(20, 300), "red")
+var o3 = new Obstacle([
+	new Point(0, 300),
+	new Point(300, 0)],
+	{
+		strokeColor:'green',
+		lineWidth: "5",
+		// fillColor: "grey"
+	}
+)
+
+var o4 = new Obstacle([
+	new Point(window.innerWidth-300, 0),
+	new Point(window.innerWidth, 300)],
+	{
+		strokeColor:'green',
+		lineWidth: "5",
+		// fillColor: "grey"
+	}
+)
+
+
+var ground = new Obstacle([new Point(0,window.innerHeight-20), new Point(window.innerWidth,window.innerHeight-20)], {})
+
+var right = new Obstacle([ new Point(window.innerWidth, window.innerHeight-20), new Point(window.innerWidth, 0)], {})
+
+var left = new Obstacle([new Point(0, window.innerHeight-20), new Point(0, 0)], {})
+
+var topy = new Obstacle([new Point(0, 0), new Point(window.innerWidth, 0)], {})
+
+
+var b = new Projectile(new Point(50, 300), "red")
 
 e.addObstacle(ground)
+e.addObstacle(right)
+e.addObstacle(left)
+e.addObstacle(topy)
 e.addObstacle(o1)
 e.addObstacle(o2)
+e.addObstacle(o3)
+e.addObstacle(o4)
 e.addProjectile(b)
 e.runloop()
 
