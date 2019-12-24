@@ -55,6 +55,15 @@ function radiansToDeg(rad) {
 }
 
 
+
+
+
+// Intersection test
+
+const DOES_NOT_INTERSECT = 0
+const DOES_INTERSECT = 1
+const COLLINEAR = 2
+
 function onSegment(p, q, r) {
 	if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) &&
 		q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y)) {
@@ -88,21 +97,24 @@ function doIntersect(p1, q1, p2, q2) {
 	var o4 = orientation(p2, q2, q1)
 
 	// General case
-	if (o1 != o2 && o3 != o4) return o1
+	var result = DOES_NOT_INTERSECT
+	if (o1 != o2 && o3 != o4) result = DOES_INTERSECT
 
 	// Special Cases
+
 	// p1, q1 and p2 are colinear and p2 lies on segment p1q1
-	if (o1 == 0 && onSegment(p1, p2, q1)) return o1
-
+	p2_on_line = (o1 == 0 && onSegment(p1, p2, q1))
 	// p1, q1 and q2 are colinear and q2 lies on segment p1q1
-	if (o2 == 0 && onSegment(p1, q2, q1)) return o1
-
+	q2_on_line = (o2 == 0 && onSegment(p1, q2, q1))
 	// p2, q2 and p1 are colinear and p1 lies on segment p2q2
-	if (o3 == 0 && onSegment(p2, p1, q2)) return o1
+	p1_on_line = (o3 == 0 && onSegment(p2, p1, q2))
+	// p2, q2 and q1 are colinear and q1 lies on segment p2q2
+	q1_on_line = (o4 == 0 && onSegment(p2, q1, q2))
+	if (p2_on_line || q2_on_line || p1_on_line || q1_on_line) result = DOES_INTERSECT
 
-		// p2, q2 and q1 are colinear and q1 lies on segment p2q2
-	if (o4 == 0 && onSegment(p2, q1, q2)) return o1
+	if ((o1==0 && o2==0) && (p2_on_line || q2_on_line)) result = COLLINEAR // Not working FIXME
+	if ((o3==0 && o4==0) && (p1_on_line || q1_on_line)) result = COLLINEAR // Not working FIXME
 
-	// return false // Doesn't fall in any of the above cases
-	return 404
+	// return DOES_NOT_INTERSECT // Doesn't fall in any of the above cases
+	return result
 }
