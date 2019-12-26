@@ -267,7 +267,7 @@ class Paddle extends Obstacle {
 
 	_computeNormalAngle(pivot, endpoint, angle) {
 		// compte normal angle based on quadrant
-		let normalAngle = Math.round(angle, 5)
+		let normalAngle = Math.round(angle*1000) / 1000
 		if (normalAngle <= 0) {
 			if (endpoint.x >= pivot.x) {
 				// top right quadrant
@@ -300,12 +300,20 @@ class Paddle extends Obstacle {
 					let pivot = this.points[this.options.pivotIndex]
 					let endpoint = this.points[i]
 					let l = new LineSegment(pivot, endpoint)
-					let norm = this._computeNormalAngle(pivot, endpoint, l.angle)
+					let limit = (this.normalAngles[i] + this.options.maxRotation * this.anticlockwise_modifier)
+					// corrections for zero crossing sweep
+					if (limit >= 360) {
+						var norm = 360 + l.angle
+					} else if (limit < 0) {
+						var norm = l.angle
+					} else {
+						var norm = this._computeNormalAngle(pivot, endpoint, l.angle)
+					}
 
 					let newstamp = new Date()
 					let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
 					let newAngle = (norm + (timedelta * this.options.paddleSpeed * this.direction))
-					let limit = (this.normalAngles[i] + this.options.maxRotation * this.anticlockwise_modifier)
+
 					let remainingDist = (limit - newAngle) * this.anticlockwise_modifier
 					if (remainingDist <= 0) {
 						newAngle = limit
@@ -317,18 +325,18 @@ class Paddle extends Obstacle {
 						newAngle = this.normalAngles[i]
 						this.move = false
 					}
-					console.log(this.normalAngles[i], newAngle, norm)
-					console.log(remainingDist, coveredDist, this.options.maxRotation, this.direction)
-					console.log("-------")
+					// console.log(this.normalAngles[i], newAngle, norm, l.angle)
+					// console.log(remainingDist, coveredDist, this.options.maxRotation, this.direction)
+					// console.log("-------")
 					let angleRad = degToRadians(newAngle.mod(360))
 					let x = pivot.x + (l.len * Math.cos(angleRad))
 					let y = pivot.y + (l.len * Math.sin(angleRad))
 					// rounding to remove float precision errors
-					this.points[i] = new Point(Math.round(x, 10), Math.round(y, 10))
+					this.points[i] = new Point(Math.round(x), Math.round(y))
 					// throw new Error("Pause!")
 				}
 			}
-			super.surfaces = super._createSurfaces() // Recreating surfaces for collision
+			super.surfaces = super._createSurfaces() // Recreating surfaces for collision detection
 		}
 	}
 

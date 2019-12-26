@@ -12,7 +12,7 @@ const trampoline_bounce = 0.9
 
 var o1 = new Paddle([
 		new Point(0, window.innerHeight-200),
-		new Point(300, window.innerHeight-20),
+		new Point(200, window.innerHeight-20),
 	],
 	{
 		strokeColor:'blue',
@@ -27,7 +27,7 @@ var o1 = new Paddle([
 
 var o2 = new Paddle([
 		new Point(window.innerWidth, window.innerHeight-200),
-		new Point(window.innerWidth-300, window.innerHeight-20),
+		new Point(window.innerWidth-200, window.innerHeight-20),
 	],
 	{
 		strokeColor:'green',
