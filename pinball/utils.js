@@ -1,3 +1,16 @@
+// constants
+const LEFTKEY = 37
+const RIGHTKEY = 39
+const DOWNKEY = 40
+
+const DOES_NOT_INTERSECT = 0
+const DOES_INTERSECT = 1
+const COLLINEAR = 2
+
+Number.prototype.mod = function(n) {
+	return ((this%n)+n)%n;
+}
+
 
 function isEmpty(obj) {
 	for(var prop in obj) {
@@ -17,32 +30,28 @@ function copyObj(src) {
 	return Object.assign({}, src);
 }
 
-// function sound(src) {
-// 	this.sound = document.createElement("audio");
-// 	this.sound.src = src;
-// 	this.sound.setAttribute("preload", "auto");
-// 	this.sound.setAttribute("controls", "none");
-// 	this.sound.style.display = "none";
-// 	document.body.appendChild(this.sound);
-// 	this.play = function(){
-// 		this.sound.play();
-// 	}
-// 	this.stop = function(){
-// 		this.sound.pause();
-// 	}
-// }
 
-
-// function playSound(n) {
-// 	var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-// 	var o = audioCtx.createOscillator()
-// 	o.type = "triangle"
-// 	o.frequency.setValueAtTime(NOTES[n], audioCtx.currentTime)
-// 	o.connect(audioCtx.destination)
-// 	o.start()
-// 	o.stop(0.1)
-// }
-
+function equalObjects(a, b) {
+	// Create arrays of property names
+	var aProps = Object.getOwnPropertyNames(a);
+	var bProps = Object.getOwnPropertyNames(b);
+	// If number of properties is different,
+	// objects are not equivalent
+	if (aProps.length != bProps.length) {
+		return false;
+	}
+	for (var i = 0; i < aProps.length; i++) {
+		var propName = aProps[i];
+		// If values of same property are not equal,
+		// objects are not equivalent
+		if (a[propName] !== b[propName]) {
+			return false;
+		}
+	}
+	// If we made it this far, objects
+	// are considered equivalent
+	return true;
+}
 
 
 function degToRadians(deg) {
@@ -56,13 +65,7 @@ function radiansToDeg(rad) {
 
 
 
-
-
 // Intersection test
-
-const DOES_NOT_INTERSECT = 0
-const DOES_INTERSECT = 1
-const COLLINEAR = 2
 
 function onSegment(p, q, r) {
 	if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) &&
@@ -118,3 +121,4 @@ function doIntersect(p1, q1, p2, q2) {
 	// return DOES_NOT_INTERSECT // Doesn't fall in any of the above cases
 	return result
 }
+
