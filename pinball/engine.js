@@ -23,27 +23,44 @@ class Point {
 }
 
 
-class VelocityVector {
-	constructor(x_vel, y_vel){
-		this.x_vel = x_vel // m/s
-		this.y_vel = y_vel // m/s
+class GenericVector {
+	constructor(x_component, y_component) {
+		this.x_component = x_component // m/s
+		this.y_component = y_component // m/s
+	}
+
+	getMagnitude() {
+		return Math.sqrt(Math.pow(this.y_component, 2) + Math.pow(this.x_component, 2))
 	}
 
 	tilt(theta) {
 		var t = degToRadians(theta)
-		var Xx_vel = Math.cos(t) * this.x_vel
-		var Yx_vel = Math.sin(t) * this.x_vel * -1
+		var Xx_vel = Math.cos(t) * this.x_component
+		var Yx_vel = Math.sin(t) * this.x_component * -1 // y is inverted on browser
 
-		var Xy_vel = Math.sin(t) * this.y_vel
-		var Yy_vel = Math.cos(t) * this.y_vel
+		var Xy_vel = Math.sin(t) * this.y_component
+		var Yy_vel = Math.cos(t) * this.y_component
 
-		return new VelocityVector(Xx_vel+Xy_vel, Yx_vel+Yy_vel)
+		this.x_component = Xx_vel+Xy_vel,
+		this.y_component = Yx_vel+Yy_vel
+	}
+}
+
+class VelocityVector extends GenericVector {
+	constructor(x_component, y_component) {
+		super(x_component, y_component)
+	}
+
+	_applyGravity(timedelta) {
+		this.y_component += (9.81 * timedelta * SCALING)
 	}
 
 	getNextPosition(pos, timedelta) {
-		// console.log(pos, timedelta)
-		var x = pos.x + (this.x_vel * timedelta)
-		var y = pos.y + (this.y_vel * timedelta)
+		/* A velocity vector will always be affected by gravity
+		* Applying gravity to y before computing next position */
+		this._applyGravity(timedelta)
+		var x = pos.x + (this.x_component * timedelta)
+		var y = pos.y + (this.y_component * timedelta)
 		return new Point(x, y)
 	}
 }
@@ -114,12 +131,13 @@ class Obstacle {
 	}
 
 	applyForceToVector(collision_surface, to_vect) {
-		var tmp = to_vect.tilt(collision_surface.angle)
-		tmp.y_vel *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
-		tmp.x_vel *= (1 - this.options.resistance) // drop x velocity by resistance
-		var new_vect = tmp.tilt(-1*collision_surface.angle)
-		console.log(to_vect, tmp, new_vect, collision_surface.angle)
-		return new_vect
+		// mutate the vector
+		to_vect.tilt(collision_surface.angle)
+		to_vect.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
+		to_vect.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
+		to_vect.tilt(-1*collision_surface.angle)
+		console.log(collision_surface.angle)
+		// return new_vect
 	}
 
 	draw(canvas) {
@@ -180,7 +198,7 @@ class Paddle extends Obstacle {
 			if (event.type==="keydown") {
 				this.paddleSpeed = this.options.maxPaddleSpeed
 				this.direction = 1 * this.anticlockwise_modifier
-			} else {
+			} else { // keyup
 				this.paddleSpeed = this.options.maxPaddleSpeed / 2 // reduce paddle return speed
 				this.direction = -1 * this.anticlockwise_modifier
 			}
@@ -202,10 +220,8 @@ class Paddle extends Obstacle {
 			if (endpoint.y <= pivot.y) {
 				// top left quadrant (inverted y)
 				normalAngle = 180 + normalAngle
-			} else {
-				//bottom right quadrant
-				// no change
 			}
+			// else { /*bottom right quadrant - no change*/ }
 		}
 		return normalAngle % 360
 	}
@@ -235,7 +251,6 @@ class Paddle extends Obstacle {
 
 				newstamp = new Date()
 				let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
-				console.log(timedelta)
 				let newAngle = (norm + (timedelta * this.paddleSpeed * this.direction))
 
 				let remainingDist = (limit - newAngle) * this.anticlockwise_modifier
@@ -248,6 +263,7 @@ class Paddle extends Obstacle {
 				if (coveredDist <= 0) {
 					newAngle = this.normalAngles[i]
 					this.moving = false
+					this.timestamp = null
 				}
 				let angleRad = degToRadians(newAngle.mod(360))
 				let x = pivot.x + (l.len * Math.cos(angleRad))
@@ -259,6 +275,8 @@ class Paddle extends Obstacle {
 			super.surfaces = super._createSurfaces() // Recreating surfaces for collision detection
 		}
 	}
+
+
 
 	draw(canvas, props) {
 		// Computes and displays new position
@@ -301,8 +319,6 @@ class Projectile {
 		}
 		let newstamp = new Date()
 		let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
-		// apply gravity
-		this.velocity.y_vel += (9.81 * timedelta * SCALING)
 		this.nextCenter = this.velocity.getNextPosition(this.center, timedelta)
 
 		props.forEach(obstacle=>{
@@ -314,7 +330,7 @@ class Projectile {
 						let travel_path = new LineSegment(this.center, this.nextCenter)
 						this.nextCenter = travel_path.intersectionPoint(surface)
 						this.backupNextCenterBy(0.2, travel_path)
-						this.velocity = obstacle.applyForceToVector(surface, this.velocity)
+						obstacle.applyForceToVector(surface, this.velocity)
 					}
 				})
 			}
