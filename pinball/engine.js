@@ -8,6 +8,10 @@ class Point {
 		this.y = y // m
 	}
 
+	copy() {
+		return new Point(this.x, this.y)
+	}
+
 	equivalent(other, error) {
 		error = error || 0
 		if ((Math.abs(this.x-other.x)<=error) && (Math.abs(this.y-other.y)<=error)) {
@@ -90,7 +94,8 @@ class Obstacle {
 	constructor(points, options) {
 		this.points = points
 		this.options = {
-			bounce: options.bounce || 0.9,
+			bounce: options.bounce || 0.9, // 90 %
+			resistance: options.resistance || 0.1, // 10 %
 			lineWidth: options.lineWidth || '2',
 			strokeColor: options.strokeColor || 'white',
 			fillColor: options.fillColor || 'white',
@@ -110,9 +115,8 @@ class Obstacle {
 
 	applyForceToVector(collision_surface, to_vect) {
 		var tmp = to_vect.tilt(collision_surface.angle)
-		// reverse perpendicular component * bounce factor
-		tmp.y_vel *= (-1 * this.options.bounce)
-		tmp.x_vel *= 0.9 // resistance
+		tmp.y_vel *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
+		tmp.x_vel *= (1 - this.options.resistance) // drop x velocity by resistance
 		var new_vect = tmp.tilt(-1*collision_surface.angle)
 		console.log(to_vect, tmp, new_vect, collision_surface.angle)
 		return new_vect
@@ -144,13 +148,12 @@ class Paddle extends Obstacle {
 		if (options.pivotIndex>=points.length) throw new Error("Paddle - 'pivotIndex' should be in 'points'")
 		if (options.keyCode===undefined) throw new Error("Paddle - missing 'keyCode' option")
 		super(points, options)
-		this.move = false
-		this.pressed = false
+		this.moving = false
 		this.direction = 1
 		this.options.keyCode = options.keyCode
 		this.options.pivotIndex = options.pivotIndex
 		this.options.maxRotation = options.maxRotation || 90 // degrees
-		this.options.maxPaddleSpeed = options.maxPaddleSpeed || 120 // degrees/sec
+		this.options.maxPaddleSpeed = options.maxPaddleSpeed || 720 // degrees/sec
 		this.options.clockwise = (options.clockwise===undefined) ? true : options.clockwise
 		this.paddleSpeed = this.options.maxPaddleSpeed
 		this.anticlockwise_modifier = this.options.clockwise ? 1 : -1
@@ -172,13 +175,13 @@ class Paddle extends Obstacle {
 
 	_handleKeyPress(event) {
 		if (this.options.keyCode==event.keyCode) {
-			this.move = true
+			this.moving = true
 			this.timestamp = new Date()
 			if (event.type==="keydown") {
 				this.paddleSpeed = this.options.maxPaddleSpeed
 				this.direction = 1 * this.anticlockwise_modifier
 			} else {
-				this.paddleSpeed = this.options.maxPaddleSpeed / 4 // reduce paddle return speed
+				this.paddleSpeed = this.options.maxPaddleSpeed / 2 // reduce paddle return speed
 				this.direction = -1 * this.anticlockwise_modifier
 			}
 		}
@@ -213,50 +216,52 @@ class Paddle extends Obstacle {
 			this.timestamp = new Date()
 			return null
 		}
-		if (this.move) {
+		if (this.moving) {
+			var newstamp = new Date()
 			for(let i=0; i<this.points.length; i++) {
-				if (i!==this.options.pivotIndex) {
-					let pivot = this.points[this.options.pivotIndex]
-					let endpoint = this.points[i]
-					let l = new LineSegment(pivot, endpoint)
-					let limit = (this.normalAngles[i] + this.options.maxRotation * this.anticlockwise_modifier)
-					// corrections for zero crossing sweep
-					if (limit >= 360) {
-						var norm = 360 + l.angle
-					} else if (limit < 0) {
-						var norm = l.angle
-					} else {
-						var norm = this._computeNormalAngle(pivot, endpoint, l.angle)
-					}
+				if (i===this.options.pivotIndex) continue
+				let pivot = this.points[this.options.pivotIndex]
+				let endpoint = this.points[i]
+				let l = new LineSegment(pivot, endpoint)
+				let limit = (this.normalAngles[i] + this.options.maxRotation * this.anticlockwise_modifier)
+				// corrections for zero crossing sweep
+				if (limit >= 360) {
+					var norm = 360 + l.angle
+				} else if (limit < 0) {
+					var norm = l.angle
+				} else {
+					var norm = this._computeNormalAngle(pivot, endpoint, l.angle)
+				}
 
-					let newstamp = new Date()
-					let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
-					let newAngle = (norm + (timedelta * this.paddleSpeed * this.direction))
+				newstamp = new Date()
+				let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
+				console.log(timedelta)
+				let newAngle = (norm + (timedelta * this.paddleSpeed * this.direction))
 
-					let remainingDist = (limit - newAngle) * this.anticlockwise_modifier
-					if (remainingDist <= 0) {
-						newAngle = limit
-						remainingDist = 0
-						// throw new Error("Pause!")
-					}
-					let coveredDist = (newAngle - this.normalAngles[i]) * this.anticlockwise_modifier
-					if (coveredDist <= 0) {
-						newAngle = this.normalAngles[i]
-						this.move = false
-					}
-					let angleRad = degToRadians(newAngle.mod(360))
-					let x = pivot.x + (l.len * Math.cos(angleRad))
-					let y = pivot.y + (l.len * Math.sin(angleRad))
-					// rounding to remove float precision errors
-					this.points[i] = new Point(Math.round(x), Math.round(y))
+				let remainingDist = (limit - newAngle) * this.anticlockwise_modifier
+				if (remainingDist <= 0) {
+					newAngle = limit
+					remainingDist = 0
 					// throw new Error("Pause!")
 				}
+				let coveredDist = (newAngle - this.normalAngles[i]) * this.anticlockwise_modifier
+				if (coveredDist <= 0) {
+					newAngle = this.normalAngles[i]
+					this.moving = false
+				}
+				let angleRad = degToRadians(newAngle.mod(360))
+				let x = pivot.x + (l.len * Math.cos(angleRad))
+				let y = pivot.y + (l.len * Math.sin(angleRad))
+				this.points[i] = new Point(x, y)
+				// throw new Error("Pause!")
 			}
+			this.timestamp = newstamp
 			super.surfaces = super._createSurfaces() // Recreating surfaces for collision detection
 		}
 	}
 
-	draw(canvas, balls) {
+	draw(canvas, props) {
+		// Computes and displays new position
 		this._updatePosition()
 		super.draw(canvas)
 	}
@@ -288,7 +293,8 @@ class Projectile {
 		}
 	}
 
-	_computeNextPosition(props) {
+	_precomputeNextPosition(props) {
+		this.center = this.nextCenter.copy()
 		if (this.timestamp===null) {
 			this.timestamp = new Date()
 			return null
@@ -317,12 +323,12 @@ class Projectile {
 	}
 
 	draw(canvas, props) {
+		// Displays current position, then computes new position
 		canvas.lineWidth = "4"
 		canvas.strokeStyle = this.color
 		canvas.rect(this.nextCenter.x, this.nextCenter.y, 1, 1) //Dot
 		canvas.stroke()
-		this.center = this.nextCenter
-		this._computeNextPosition(props)
+		this._precomputeNextPosition(props)
 		// canvas.fillStyle = this.color
 		// canvas.fillRect(this.center.x, this.center.y, 1, 1)
 	}
