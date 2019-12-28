@@ -56,7 +56,7 @@ class LineSegment {
 		this.angle = radiansToDeg(Math.atan(this.slope))
 	}
 
-	collisionPoint(other) {
+	intersectionPoint(other) {
 		// slope is Infinity for vertical lines
 		if (this.slope===Infinity) {
 			var x = this.p1.x
@@ -74,32 +74,6 @@ class LineSegment {
 	passesBetween(a, b) {
 		return doIntersect(a, b, this.p1, this.p2)
 	}
-
-	// containsPoint(p) {
-	// 	return (p.x <= Math.max(this.p1.x, this.p2.x) && p.x >= Math.min(this.p1.x, this.p2.x) &&
-	// 		p.y <= Math.max(this.p1.y, this.p2.y) && p.y >= Math.min(this.p1.y, this.p2.y))
-	// }
-
-	// willCollideWith(other) {
-	// 	if (this.slope===other.slope) return null // Posible collinear, buwedoncare
-	// 	// slope is Infinity for vertical lines
-	// 	if (this.slope===Infinity) {
-	// 		var x = this.p1.x
-	// 		var y = (other.slope*x) + other.c
-	// 	} else if (other.slope===Infinity) {
-	// 		var x = other.p1.x
-	// 		var y = (this.slope*x) + this.c
-	// 	} else {
-	// 		var x = (other.c-this.c) / (this.slope-other.slope)
-	// 		var y = (this.slope*x) + this.c
-	// 	}
-	// 	var resp = new Point(x, y)
-	// 	if (this.containsPoint(resp) && other.containsPoint(resp)) {
-	// 		return resp
-	// 	} else {
-	// 		return null
-	// 	}
-	// }
 }
 
 
@@ -120,39 +94,13 @@ class BasicPlane extends LineSegment {
 	}
 
 	doesCollideWith(obj) {
-		// if (prev_dst_center.x!==this.nextCenter.x && prev_dst_center.y!==this.nextCenter.y) {
-		// 	path = new LineSegment(this.center, this.nextCenter)
-		// }
-		// var point = path.willCollideWith(line)
-		// if (point!==null) {
-		// 	// console.clear()
-		// 	// console.log("Bang!!", this.nextCenter, point)
-		// 	// step back by n pixels
-		// 	var tmpx = this.center.x - point.x
-		// 	var tmpy = this.center.y - point.y
-		// 	var backoff = 0.1
-		// 	// console.log(tmpx, tmpy)
-		// 	prev_dst_center = this.nextCenter
-		// 	if (Math.abs(tmpx)>=Math.abs(tmpy)) {
-		// 		var nx = point.x + (backoff*(tmpx/Math.abs(tmpx)))
-		// 		this.nextCenter = new Point(nx, (path.slope*nx)+path.c)
-		// 	} else {
-		// 		var ny = point.y + (backoff*(tmpy/Math.abs(tmpy)))
-		// 		var nx = (path.slope===Infinity) ? point.x : (ny - path.c)/path.slope // vertical fall has infinite slope
-		// 		this.nextCenter = new Point(nx, ny)
-		// 	}
-		// 	this.velocity = line.applyForce(this.velocity)
-		// 	this.velocity.x_vel *=0.9 // resistance
-		// }
-
-		// Working method
 		var does_intersect = super.passesBetween(obj.center, obj.nextCenter)
 		if ((does_intersect==DOES_INTERSECT) || (does_intersect==COLLINEAR)) {
 			if (does_intersect==DOES_INTERSECT) {
 				console.clear()
 				console.log("Bang!!", obj.nextCenter, does_intersect)
 				var path = new LineSegment(obj.center, obj.nextCenter)
-				var point = path.collisionPoint(this)
+				var point = path.intersectionPoint(this)
 
 				// step back by n pixels
 				var tmpx = obj.center.x - point.x
@@ -169,8 +117,6 @@ class BasicPlane extends LineSegment {
 				}
 				return point
 			}
-			// return true
-			// obj.velocity.// resistance
 			// throw new Error("Pause!")
 		}
 		return false
@@ -232,10 +178,10 @@ class Paddle extends Obstacle {
 		this.direction = 1
 		this.options.keyCode = options.keyCode
 		this.options.pivotIndex = options.pivotIndex
-		this.options.paddleSpeed = options.paddleSpeed || 100 // degrees/sec
 		this.options.maxRotation = options.maxRotation || 90 // degrees
-		// When ro
+		this.options.maxPaddleSpeed = options.maxPaddleSpeed || 120 // degrees/sec
 		this.options.clockwise = (options.clockwise===undefined) ? true : options.clockwise
+		this.paddleSpeed = this.options.maxPaddleSpeed
 		this.anticlockwise_modifier = this.options.clockwise ? 1 : -1
 
 		this.normalAngles = {}
@@ -258,8 +204,10 @@ class Paddle extends Obstacle {
 			this.move = true
 			this.timestamp = new Date()
 			if (event.type==="keydown") {
+				this.paddleSpeed = this.options.maxPaddleSpeed
 				this.direction = 1 * this.anticlockwise_modifier
 			} else {
+				this.paddleSpeed = this.options.maxPaddleSpeed / 4 // reduce paddle return speed
 				this.direction = -1 * this.anticlockwise_modifier
 			}
 		}
@@ -312,7 +260,7 @@ class Paddle extends Obstacle {
 
 					let newstamp = new Date()
 					let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
-					let newAngle = (norm + (timedelta * this.options.paddleSpeed * this.direction))
+					let newAngle = (norm + (timedelta * this.paddleSpeed * this.direction))
 
 					let remainingDist = (limit - newAngle) * this.anticlockwise_modifier
 					if (remainingDist <= 0) {

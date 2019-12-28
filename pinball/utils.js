@@ -68,6 +68,7 @@ function radiansToDeg(rad) {
 // Intersection test
 
 function onSegment(p, q, r) {
+	// tests if q lies on segment between p and r
 	if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) &&
 		q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y)) {
 		return true
