@@ -56,70 +56,31 @@ class LineSegment {
 		this.angle = radiansToDeg(Math.atan(this.slope))
 	}
 
+	get_y(x) {
+		return (this.slope*x) + this.c
+	}
+
+	get_x(y) {
+		return (y - this.c)/this.slope
+	}
+
 	intersectionPoint(other) {
 		// slope is Infinity for vertical lines
 		if (this.slope===Infinity) {
 			var x = this.p1.x
-			var y = (other.slope*x) + other.c
+			var y = other.get_y(x)
 		} else if (other.slope===Infinity) {
 			var x = other.p1.x
-			var y = (this.slope*x) + this.c
+			var y = this.get_y(x)
 		} else {
 			var x = (other.c-this.c) / (this.slope-other.slope)
-			var y = (this.slope*x) + this.c
+			var y = this.get_y(x)
 		}
 		return new Point(x, y)
 	}
 
 	passesBetween(a, b) {
-		return doIntersect(a, b, this.p1, this.p2)
-	}
-}
-
-
-class BasicPlane extends LineSegment {
-	constructor(p1, p2, bounce) {
-		super(p1, p2)
-		this.bounce = bounce || 0.9 // Surfaces are not perfectly bouncy
-	}
-
-	applyForceToVector(to_vect) {
-		var tmp = to_vect.tilt(this.angle)
-		// reverse perpendicular component * bounce factor
-		tmp.y_vel *= (-1 * this.bounce)
-		tmp.x_vel *= 0.9 // resistance
-		var new_vect = tmp.tilt(-1*this.angle)
-		console.log(to_vect, tmp, new_vect, this.angle)
-		return new_vect
-	}
-
-	doesCollideWith(obj) {
-		var does_intersect = super.passesBetween(obj.center, obj.nextCenter)
-		if ((does_intersect==DOES_INTERSECT) || (does_intersect==COLLINEAR)) {
-			if (does_intersect==DOES_INTERSECT) {
-				console.clear()
-				console.log("Bang!!", obj.nextCenter, does_intersect)
-				var path = new LineSegment(obj.center, obj.nextCenter)
-				var point = path.intersectionPoint(this)
-
-				// step back by n pixels
-				var tmpx = obj.center.x - point.x
-				var tmpy = obj.center.y - point.y
-				var backoff = 0.1
-
-				if (Math.abs(tmpx)>=Math.abs(tmpy)) {
-					var nx = point.x + (backoff*(tmpx/Math.abs(tmpx)))
-					obj.nextCenter = new Point(nx, (path.slope*nx)+path.c)
-				} else {
-					var ny = point.y + (backoff*(tmpy/Math.abs(tmpy)))
-					var nx = (path.slope===Infinity) ? point.x : (ny - path.c)/path.slope // vertical fall has infinite slope
-					obj.nextCenter = new Point(nx, ny)
-				}
-				return point
-			}
-			// throw new Error("Pause!")
-		}
-		return false
+		return (doIntersect(a, b, this.p1, this.p2)===DOES_INTERSECT) // can also be DOES_NOT_INTERSECT, COLLINEAR
 	}
 }
 
@@ -129,7 +90,7 @@ class Obstacle {
 	constructor(points, options) {
 		this.points = points
 		this.options = {
-			bounce: options.bounce,
+			bounce: options.bounce || 0.9,
 			lineWidth: options.lineWidth || '2',
 			strokeColor: options.strokeColor || 'white',
 			fillColor: options.fillColor || 'white',
@@ -142,9 +103,19 @@ class Obstacle {
 		let surf = []
 		for(var i=1; i<this.points.length; i++) {
 			// i begins from 1
-			surf.push(new BasicPlane(this.points[i], this.points[i-1], this.options.bounce))
+			surf.push(new LineSegment(this.points[i], this.points[i-1]))
 		}
 		return surf
+	}
+
+	applyForceToVector(collision_surface, to_vect) {
+		var tmp = to_vect.tilt(collision_surface.angle)
+		// reverse perpendicular component * bounce factor
+		tmp.y_vel *= (-1 * this.options.bounce)
+		tmp.x_vel *= 0.9 // resistance
+		var new_vect = tmp.tilt(-1*collision_surface.angle)
+		console.log(to_vect, tmp, new_vect, collision_surface.angle)
+		return new_vect
 	}
 
 	draw(canvas) {
@@ -273,9 +244,6 @@ class Paddle extends Obstacle {
 						newAngle = this.normalAngles[i]
 						this.move = false
 					}
-					// console.log(this.normalAngles[i], newAngle, norm, l.angle)
-					// console.log(remainingDist, coveredDist, this.options.maxRotation, this.direction)
-					// console.log("-------")
 					let angleRad = degToRadians(newAngle.mod(360))
 					let x = pivot.x + (l.len * Math.cos(angleRad))
 					let y = pivot.y + (l.len * Math.sin(angleRad))
@@ -288,7 +256,7 @@ class Paddle extends Obstacle {
 		}
 	}
 
-	draw(canvas) {
+	draw(canvas, balls) {
 		this._updatePosition()
 		super.draw(canvas)
 	}
@@ -305,6 +273,21 @@ class Projectile {
 		this.timestamp = null
 	}
 
+	backupNextCenterBy(steps, travel_path) {
+		// step back by some pixels
+		var delta_x = this.center.x - this.nextCenter.x
+		var delta_y = this.center.y - this.nextCenter.y
+
+		if (Math.abs(delta_x)>=Math.abs(delta_y)) {
+			var nx = this.nextCenter.x + (steps*(delta_x/Math.abs(delta_x)))
+			this.nextCenter = new Point(nx, travel_path.get_y(nx))
+		} else {
+			var ny = this.nextCenter.y + (steps*(delta_y/Math.abs(delta_y)))
+			var nx = (travel_path.slope===Infinity) ? this.nextCenter.x : travel_path.get_x(ny) // vertical fall has infinite slope
+			this.nextCenter = new Point(nx, ny)
+		}
+	}
+
 	_computeNextPosition(props) {
 		if (this.timestamp===null) {
 			this.timestamp = new Date()
@@ -316,11 +299,16 @@ class Projectile {
 		this.velocity.y_vel += (9.81 * timedelta * SCALING)
 		this.nextCenter = this.velocity.getNextPosition(this.center, timedelta)
 
-		props.forEach(p=>{
-			if (p instanceof Obstacle) {
-				p.surfaces.forEach(surface=>{
-					if (surface.doesCollideWith(this)) {
-						this.velocity = surface.applyForceToVector(this.velocity)
+		props.forEach(obstacle=>{
+			if (obstacle instanceof Obstacle) {
+				obstacle.surfaces.forEach(surface=>{
+					if (surface.passesBetween(this.center, this.nextCenter)) {
+						console.clear()
+						console.log("Bang!!")
+						let travel_path = new LineSegment(this.center, this.nextCenter)
+						this.nextCenter = travel_path.intersectionPoint(surface)
+						this.backupNextCenterBy(0.2, travel_path)
+						this.velocity = obstacle.applyForceToVector(surface, this.velocity)
 					}
 				})
 			}
@@ -331,7 +319,7 @@ class Projectile {
 	draw(canvas, props) {
 		canvas.lineWidth = "4"
 		canvas.strokeStyle = this.color
-		canvas.rect(this.nextCenter.x, this.nextCenter.y, 1, 1)
+		canvas.rect(this.nextCenter.x, this.nextCenter.y, 1, 1) //Dot
 		canvas.stroke()
 		this.center = this.nextCenter
 		this._computeNextPosition(props)
