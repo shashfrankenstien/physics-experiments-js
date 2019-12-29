@@ -12,6 +12,10 @@ class Point {
 		return new Point(this.x, this.y)
 	}
 
+	distanceFrom(other) {
+		return Math.sqrt(Math.pow(other.y-this.y, 2) + Math.pow(other.x-this.x, 2))
+	}
+
 	equivalent(other, error) {
 		error = error || 0
 		if ((Math.abs(this.x-other.x)<=error) && (Math.abs(this.y-other.y)<=error)) {
@@ -47,12 +51,13 @@ class GenericVector {
 }
 
 class VelocityVector extends GenericVector {
-	constructor(x_component, y_component) {
+	constructor(x_component, y_component, mass) {
 		super(x_component, y_component)
+		this.mass = mass || 1
 	}
 
 	_applyGravity(timedelta) {
-		this.y_component += (9.81 * timedelta * SCALING)
+		this.y_component += (this.mass * 9.81 * timedelta * SCALING)
 	}
 
 	getNextPosition(pos, timedelta) {
@@ -71,10 +76,11 @@ class LineSegment {
 		this.p1 = p1
 		this.p2 = p2
 
-		this.len = Math.sqrt(Math.pow(this.p2.y-this.p1.y, 2) + Math.pow(this.p2.x-this.p1.x, 2))
+		// this.len = Math.sqrt(Math.pow(this.p2.y-this.p1.y, 2) + Math.pow(this.p2.x-this.p1.x, 2))
+		this.len = this.p1.distanceFrom(this.p2)
 		this.slope = (this.p2.y-this.p1.y) / (this.p2.x-this.p1.x)
 		this.c = this.p1.y - (this.slope*this.p1.x)
-		this.angle = radiansToDeg(Math.atan(this.slope))
+		this.angle = radiansToDeg(Math.atan(this.slope)) // angle of inclination (-90 to 90)
 	}
 
 	get_y(x) {
@@ -87,10 +93,10 @@ class LineSegment {
 
 	intersectionPoint(other) {
 		// slope is Infinity for vertical lines
-		if (this.slope===Infinity) {
+		if (Math.abs(this.slope)===Infinity) {
 			var x = this.p1.x
 			var y = other.get_y(x)
-		} else if (other.slope===Infinity) {
+		} else if (Math.abs(other.slope)===Infinity) {
 			var x = other.p1.x
 			var y = this.get_y(x)
 		} else {
@@ -125,27 +131,23 @@ class Obstacle {
 		let surf = []
 		for(var i=1; i<this.points.length; i++) {
 			// i begins from 1
-			surf.push(new LineSegment(this.points[i], this.points[i-1]))
+			let s = new LineSegment(this.points[i], this.points[i-1])
+			// s.index = i-1
+			surf.push(s)
 		}
 		return surf
 	}
 
-	applyForceToVector(collision_surface, to_vect) {
-		// mutate the vector
-		to_vect.tilt(collision_surface.angle)
-		to_vect.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
-		to_vect.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
-		to_vect.tilt(-1*collision_surface.angle)
-		console.log(collision_surface.angle)
-		// return new_vect
+
+	applyForceToVector(vect, collision_surface) {
+
 	}
 
-	draw(canvas) {
+	_paintCanvas(canvas) {
 		canvas.beginPath() // Start a new path.
 		canvas.lineWidth = this.options.lineWidth
 		canvas.strokeStyle = this.options.strokeColor
 		canvas.fillStyle = this.options.fillColor
-
 		for(let i=0; i<this.points.length; i++) {
 			if (i===0) {
 				canvas.moveTo(this.points[i].x, this.points[i].y)
@@ -156,6 +158,31 @@ class Obstacle {
 		canvas.fill()
 		canvas.stroke()
 		canvas.closePath()
+	}
+
+	draw(canvas, props) {
+		this._paintCanvas(canvas)
+		props.forEach(projectile=>{
+			if (projectile instanceof Projectile) {
+				this.surfaces.forEach(surface=> {
+					if (surface.passesBetween(projectile.center, projectile.nextCenter)) {
+						// throw new Error("Pause")
+						console.clear()
+						console.log("Bang!!")
+						let travel_path = new LineSegment(projectile.center, projectile.nextCenter)
+						projectile.nextCenter = travel_path.intersectionPoint(surface)
+						projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
+						this.applyForceToVector(projectile.velocity, surface)
+						// mutate the velocity vector
+						projectile.velocity.tilt(surface.angle)
+						projectile.velocity.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
+						projectile.velocity.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
+						projectile.velocity.tilt(-1*surface.angle)
+						console.log(projectile.velocity, surface.angle)
+					}
+				})
+			}
+		})
 	}
 }
 
@@ -171,24 +198,25 @@ class Paddle extends Obstacle {
 		this.options.keyCode = options.keyCode
 		this.options.pivotIndex = options.pivotIndex
 		this.options.maxRotation = options.maxRotation || 90 // degrees
-		this.options.maxPaddleSpeed = options.maxPaddleSpeed || 720 // degrees/sec
+		this.options.maxPaddleSpeed = options.maxPaddleSpeed || 600 // degrees/sec
 		this.options.clockwise = (options.clockwise===undefined) ? true : options.clockwise
 		this.paddleSpeed = this.options.maxPaddleSpeed
 		this.anticlockwise_modifier = this.options.clockwise ? 1 : -1
 
+		this.pivot_point = this.points[this.options.pivotIndex] // pivot point is always fixed
 		this.normalAngles = {}
 		for(let i=0; i<this.points.length; i++) {
 			if (i!==this.options.pivotIndex) {
-				let pivot = this.points[this.options.pivotIndex]
-				let endpoint = this.points[i]
-				let l = new LineSegment(pivot, endpoint)
-				this.normalAngles[i] = this._computeNormalAngle(pivot, endpoint, l.angle)
+				let l = new LineSegment(this.pivot_point, this.points[i])
+				this.normalAngles[i] = this._computeNormalAngle(this.pivot_point, this.points[i], l.angle)
 			}
 		}
 
 		window.addEventListener("keydown", ev=>this._handleKeyPress(ev))
 		window.addEventListener("keyup", ev=>this._handleKeyPress(ev))
+
 		this.timestamp = null
+		this.surface_debounce = []
 	}
 
 	_handleKeyPress(event) {
@@ -205,9 +233,9 @@ class Paddle extends Obstacle {
 		}
 	}
 
-	_computeNormalAngle(pivot, endpoint, angle) {
-		// compte normal angle based on quadrant
-		let normalAngle = Math.round(angle*1000) / 1000
+	_computeNormalAngle(pivot, endpoint, inclination) {
+		// compute normal angle based on quadrant
+		let normalAngle = Math.round(inclination*1000) / 1000
 		if (normalAngle <= 0) {
 			if (endpoint.x >= pivot.x) {
 				// top right quadrant
@@ -223,65 +251,111 @@ class Paddle extends Obstacle {
 			}
 			// else { /*bottom right quadrant - no change*/ }
 		}
-		return normalAngle % 360
+		return normalAngle.mod(360)
 	}
 
 
-	_updatePosition() {
+	_computeNewSurfaces() {
 		if (this.timestamp===null) {
 			this.timestamp = new Date()
 			return null
 		}
-		if (this.moving) {
-			var newstamp = new Date()
-			for(let i=0; i<this.points.length; i++) {
-				if (i===this.options.pivotIndex) continue
-				let pivot = this.points[this.options.pivotIndex]
-				let endpoint = this.points[i]
-				let l = new LineSegment(pivot, endpoint)
-				let limit = (this.normalAngles[i] + this.options.maxRotation * this.anticlockwise_modifier)
-				// corrections for zero crossing sweep
-				if (limit >= 360) {
-					var norm = 360 + l.angle
-				} else if (limit < 0) {
-					var norm = l.angle
-				} else {
-					var norm = this._computeNormalAngle(pivot, endpoint, l.angle)
-				}
+		var newstamp = new Date()
+		for(let i=0; i<this.points.length; i++) {
+			if (i===this.options.pivotIndex) continue
+			let endpoint = this.points[i]
+			let l = new LineSegment(this.pivot_point, endpoint)
+			let limit = (this.normalAngles[i] + this.options.maxRotation * this.anticlockwise_modifier)
+			// corrections for zero crossing sweep
+			if (limit >= 360) {
+				var norm = 360 + l.angle
+			} else if (limit < 0) {
+				var norm = l.angle
+			} else {
+				var norm = this._computeNormalAngle(this.pivot_point, endpoint, l.angle)
+			}
 
-				newstamp = new Date()
-				let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
-				let newAngle = (norm + (timedelta * this.paddleSpeed * this.direction))
+			newstamp = new Date()
+			let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
+			let newAngle = (norm + (timedelta * this.paddleSpeed * this.direction))
 
-				let remainingDist = (limit - newAngle) * this.anticlockwise_modifier
-				if (remainingDist <= 0) {
-					newAngle = limit
-					remainingDist = 0
-					// throw new Error("Pause!")
-				}
-				let coveredDist = (newAngle - this.normalAngles[i]) * this.anticlockwise_modifier
-				if (coveredDist <= 0) {
-					newAngle = this.normalAngles[i]
-					this.moving = false
-					this.timestamp = null
-				}
-				let angleRad = degToRadians(newAngle.mod(360))
-				let x = pivot.x + (l.len * Math.cos(angleRad))
-				let y = pivot.y + (l.len * Math.sin(angleRad))
-				this.points[i] = new Point(x, y)
+			let remainingDist = (limit - newAngle) * this.anticlockwise_modifier
+			if (remainingDist <= 0) {
+				newAngle = limit
+				remainingDist = 0
 				// throw new Error("Pause!")
 			}
-			this.timestamp = newstamp
-			super.surfaces = super._createSurfaces() // Recreating surfaces for collision detection
+			let coveredDist = (newAngle - this.normalAngles[i]) * this.anticlockwise_modifier
+			if (coveredDist <= 0) {
+				newAngle = this.normalAngles[i]
+				this.moving = false
+				this.timestamp = null
+			}
+			let angleRad = degToRadians(newAngle.mod(360))
+			let x = this.pivot_point.x + (l.len * Math.cos(angleRad))
+			let y = this.pivot_point.y + (l.len * Math.sin(angleRad))
+			this.points[i] = new Point(x, y)
+			// console.log(timedelta)
+			// throw new Error("Pause!")
 		}
+		this.timestamp = newstamp
+		return super._createSurfaces() // Recreating surfaces for collision detection
+	}
+
+	_surfaceMovingTowards(surface, pnt) {
+		return orientation(surface.p1, surface.p2, pnt)*this.direction===1
 	}
 
 
 
 	draw(canvas, props) {
 		// Computes and displays new position
-		this._updatePosition()
-		super.draw(canvas)
+		if (this.moving) {
+			// let prev_surfaces = this.surfaces
+			this.surfaces = this._computeNewSurfaces()
+			props.forEach(projectile=>{
+				const travel_path = new LineSegment(projectile.center, projectile.nextCenter)
+				for (let i=0; i<this.surfaces.length; i++) {
+					const fake_trailing_center = projectile.backupNextCenterBy(travel_path.len*2, travel_path)
+					// console.log(this._surfaceMovingTowards(prev_surfaces[i], fake_trailing_center),
+					// this._surfaceMovingTowards(this.surfaces[i], fake_trailing_center),
+					// this.pivot_point.distanceFrom(projectile.nextCenter)<=this.surfaces[i].len)
+					console.log(this.surface_debounce[i])
+					if (
+						this.surfaces[i].passesBetween(fake_trailing_center, projectile.nextCenter)
+						//  && this._surfaceMovingTowards(this.surfaces[i], fake_trailing_center)
+						&& !this.surface_debounce[i]
+						) {
+						console.log("COLLISION!!!!!")
+						let fake_trailing_path = new LineSegment(fake_trailing_center, projectile.nextCenter)
+						let collision_point = fake_trailing_path.intersectionPoint(this.surfaces[i])
+						projectile.nextCenter = projectile.center.copy()
+						// projectile.nextCenter = fake_trailing_path.intersectionPoint(this.surfaces[i])
+						// projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
+
+						let omega = degToRadians(this.paddleSpeed * this.direction )
+						let radiusLine = new LineSegment(this.pivot_point, collision_point)
+						let v = new VelocityVector(omega*radiusLine.len, 0)
+						console.log(projectile.velocity)
+						console.log(v)
+
+						let tilt_angle = (90-radiusLine.angle) //* (radiusLine.angle<0 ? -1: 1)
+						v.tilt(tilt_angle)
+						console.log(v)
+						projectile.velocity.x_component += v.x_component * this.anticlockwise_modifier
+						projectile.velocity.y_component += v.y_component * this.anticlockwise_modifier
+						console.log(projectile.velocity, radiusLine.angle, tilt_angle, omega)
+						this.surface_debounce[i] = true
+						// throw new Error("Pause")
+					} else {
+						this.surface_debounce[i] = false
+					}
+				}
+			})
+			super._paintCanvas(canvas)
+		} else {
+			super.draw(canvas, props)
+		}
 	}
 }
 
@@ -303,15 +377,15 @@ class Projectile {
 
 		if (Math.abs(delta_x)>=Math.abs(delta_y)) {
 			var nx = this.nextCenter.x + (steps*(delta_x/Math.abs(delta_x)))
-			this.nextCenter = new Point(nx, travel_path.get_y(nx))
+			var ny = travel_path.get_y(nx)
 		} else {
 			var ny = this.nextCenter.y + (steps*(delta_y/Math.abs(delta_y)))
-			var nx = (travel_path.slope===Infinity) ? this.nextCenter.x : travel_path.get_x(ny) // vertical fall has infinite slope
-			this.nextCenter = new Point(nx, ny)
+			var nx = (Math.abs(travel_path.slope)===Infinity) ? this.nextCenter.x : travel_path.get_x(ny) // vertical fall has infinite slope
 		}
+		return new Point(nx, ny)
 	}
 
-	_precomputeNextPosition(props) {
+	_precomputeNextPosition() {
 		this.center = this.nextCenter.copy()
 		if (this.timestamp===null) {
 			this.timestamp = new Date()
@@ -320,31 +394,16 @@ class Projectile {
 		let newstamp = new Date()
 		let timedelta = (newstamp.getTime() - this.timestamp.getTime())/1000
 		this.nextCenter = this.velocity.getNextPosition(this.center, timedelta)
-
-		props.forEach(obstacle=>{
-			if (obstacle instanceof Obstacle) {
-				obstacle.surfaces.forEach(surface=>{
-					if (surface.passesBetween(this.center, this.nextCenter)) {
-						console.clear()
-						console.log("Bang!!")
-						let travel_path = new LineSegment(this.center, this.nextCenter)
-						this.nextCenter = travel_path.intersectionPoint(surface)
-						this.backupNextCenterBy(0.2, travel_path)
-						obstacle.applyForceToVector(surface, this.velocity)
-					}
-				})
-			}
-		})
 		this.timestamp = newstamp
 	}
 
-	draw(canvas, props) {
+	draw(canvas) {
 		// Displays current position, then computes new position
 		canvas.lineWidth = "4"
 		canvas.strokeStyle = this.color
 		canvas.rect(this.nextCenter.x, this.nextCenter.y, 1, 1) //Dot
 		canvas.stroke()
-		this._precomputeNextPosition(props)
+		this._precomputeNextPosition()
 		// canvas.fillStyle = this.color
 		// canvas.fillRect(this.center.x, this.center.y, 1, 1)
 	}
@@ -370,7 +429,7 @@ class Environment {
 	draw() {
 		this.canvas.clearRect(0, 0, this.canvas_elem.width, this.canvas_elem.height)
 		this.obstacles.forEach(s=>s.draw(this.canvas, this.balls))
-		this.balls.forEach((b)=>b.draw(this.canvas, this.obstacles))
+		this.balls.forEach((b)=>b.draw(this.canvas))
 	}
 
 	runloop() {

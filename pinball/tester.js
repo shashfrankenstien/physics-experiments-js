@@ -82,7 +82,7 @@ e.addObstacle(o4)
 e.draw()
 
 
-e.addProjectile(new Projectile(new Point(window.innerWidth-15, window.innerHeight-500), "red", new VelocityVector(0,0)))
+e.addProjectile(new Projectile(new Point(150, window.innerHeight-500), "red", new VelocityVector(0,0)))
 e.runloop()
 
 // function start(evnt) {
