@@ -416,6 +416,7 @@ class Environment {
 		this.canvas = this.canvas_elem.getContext('2d')
 		this.balls = []
 		this.obstacles = []
+		this.draw = this.draw.bind(this) // bind this so that it can be called from requestAnimationFrame
 	}
 
 	addObstacle(obs) {
@@ -430,15 +431,17 @@ class Environment {
 		this.canvas.clearRect(0, 0, this.canvas_elem.width, this.canvas_elem.height)
 		this.obstacles.forEach(s=>s.draw(this.canvas, this.balls))
 		this.balls.forEach((b)=>b.draw(this.canvas))
+		requestAnimationFrame(this.draw)
 	}
 
 	runloop() {
 		// var loop_start = new Date()
-		this.draw()
+		// this.draw()
 		// var loop_end = new Date()
 		// var diff = (loop_end.getTime() - loop_start.getTime())
 		// console.log(diff)
-		setTimeout(()=>this.runloop(), 15)
+		// setTimeout(()=>this.runloop(), 15)
+		requestAnimationFrame(this.draw)
 	}
 }
 
