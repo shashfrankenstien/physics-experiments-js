@@ -70,8 +70,8 @@ var container = new Obstacle([
 	{fill:false}
 )
 
-container.addEventListener('collision', (surface, projectile)=>{
-	console.clear()
+o1.addEventListener('collision', (surface, projectile)=>{
+	// console.clear()
 	console.log("Bang!!")
 	console.log(projectile.velocity)
 	console.log(surface.angle)
@@ -88,7 +88,7 @@ e.addObstacle(o4)
 e.draw()
 
 
-e.addProjectile(new Projectile(new Point(100, window.innerHeight-500), "red", new VelocityVector(0,0)))
+e.addProjectile(new Projectile(new Point(105, window.innerHeight-500), "red", new VelocityVector(0,-200)))
 e.runloop()
 
 // function start(evnt) {

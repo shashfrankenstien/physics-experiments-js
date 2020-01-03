@@ -151,6 +151,7 @@ class Obstacle {
 			fillColor: options.fillColor || 'white',
 		}
 		this.surfaces = this._createSurfaces()
+		this.projectile_orientations = {}
 		this.event_listeners = {}
 	}
 
@@ -199,24 +200,50 @@ class Obstacle {
 
 	draw(canvas, props) {
 		this._paintCanvas(canvas)
-		props.forEach(projectile=>{
+		for (let pid=0; pid<props.length; pid++) {
+			let projectile = props[pid]
+		// props.forEach(projectile=>{
 			if (projectile instanceof Projectile) {
-				this.surfaces.forEach(surface=> {
-					// console.log(surface.perpendicularDistance(projectile.nextCenter))
-					if (surface.passesBetween(projectile.center, projectile.nextCenter)) {
-						let travel_path = new LineSegmentLite(projectile.center, projectile.nextCenter)
-						projectile.nextCenter = travel_path.intersectionPoint(surface)
-						projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
-						// mutate the velocity vector
-						projectile.velocity.tilt(surface.angle)
-						projectile.velocity.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
-						projectile.velocity.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
-						projectile.velocity.tilt(-1*surface.angle)
-						this._didCollideEvent(surface, projectile)
-					}
-				})
+				for (let sid=0; sid<this.surfaces.length; sid++) {
+					let surface = this.surfaces[sid]
+					let on_line = onSegment(surface.p1, projectile.nextCenter, surface.p2)
+					// console.log(son_line)
+					if (!on_line) continue
+					let cur_orient = orientation(surface.p1, surface.p2, projectile.nextCenter)
+					if (!this.projectile_orientations[sid]) this.projectile_orientations[sid] = {}
+					if (!this.projectile_orientations[sid][pid]) this.projectile_orientations[sid][pid] = cur_orient
+
+					if(this.projectile_orientations[sid][pid]===cur_orient) continue
+
+					let travel_path = new LineSegmentLite(projectile.center, projectile.nextCenter)
+					projectile.nextCenter = travel_path.intersectionPoint(surface)
+					projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
+					// mutate the velocity vector
+					projectile.velocity.tilt(surface.angle)
+					projectile.velocity.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
+					projectile.velocity.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
+					projectile.velocity.tilt(-1*surface.angle)
+					this._didCollideEvent(surface, projectile)
+
+				}
+				// console.log(
+				// 	surface.perpendicularDistance(projectile.nextCenter),
+				// )
+				// this.surfaces.forEach(surface=> {
+				// 	if (surface.passesBetween(projectile.center, projectile.nextCenter)) {
+				// 		let travel_path = new LineSegmentLite(projectile.center, projectile.nextCenter)
+				// 		projectile.nextCenter = travel_path.intersectionPoint(surface)
+				// 		projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
+				// 		// mutate the velocity vector
+				// 		projectile.velocity.tilt(surface.angle)
+				// 		projectile.velocity.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
+				// 		projectile.velocity.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
+				// 		projectile.velocity.tilt(-1*surface.angle)
+				// 		this._didCollideEvent(surface, projectile)
+				// 	}
+				// })
 			}
-		})
+		}
 	}
 }
 
