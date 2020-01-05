@@ -1,4 +1,5 @@
 "use strict";
+
 const SCALING = 100
 const CANVAS_WIDTH = window.innerWidth
 const CANVAS_HEIGHT = window.innerHeight
@@ -14,8 +15,12 @@ class Point {
 		return new Point(this.x, this.y)
 	}
 
+	distance2From(other) {
+		return Math.pow(other.y-this.y, 2) + Math.pow(other.x-this.x, 2)
+	}
+
 	distanceFrom(other) {
-		return Math.sqrt(Math.pow(other.y-this.y, 2) + Math.pow(other.x-this.x, 2))
+		return Math.sqrt(this.distance2From(other))
 	}
 
 	equivalent(other, error) {
@@ -78,13 +83,11 @@ class LineSegmentLite {
 		this.p1 = p1
 		this.p2 = p2
 
-		this.slope = (this.p2.y-this.p1.y) / (this.p2.x-this.p1.x)
-		this.c = this.p1.y - (this.slope*this.p1.x)
-	}
+		this._xdelta = this.p2.x-this.p1.x
+		this._ydelta = this.p2.y-this.p1.y
 
-	calculate() {
-		this.len = this.p1.distanceFrom(this.p2)
-		this.angle = radiansToDeg(Math.atan(this.slope)) // angle of inclination (-90 to 90)
+		this.slope = (this._ydelta) / (this._xdelta)
+		this.c = this.p1.y - (this.slope*this.p1.x)
 	}
 
 	get_y(x) {
@@ -132,7 +135,14 @@ class LineSegment extends LineSegmentLite {
 	// Calculates length and angle of inclination at construction
 	constructor(p1, p2) {
 		super(p1, p2)
-		this.calculate()
+		this.len2 = this.p1.distance2From(this.p2)
+		this.len = Math.sqrt(this.len2)
+		this.angle = radiansToDeg(Math.atan(this.slope)) // angle of inclination (-90 to 90)
+	}
+
+	projectionRatio(p) {
+		// projection ratio is between 0 and 1 if projection is within segment
+		return ((p.x - this.p1.x) * this._xdelta + (p.y - this.p1.y) * this._ydelta) / this.len2
 	}
 }
 
@@ -202,17 +212,20 @@ class Obstacle {
 		this._paintCanvas(canvas)
 		for (let pid=0; pid<props.length; pid++) {
 			let projectile = props[pid]
-		// props.forEach(projectile=>{
 			if (projectile instanceof Projectile) {
 				for (let sid=0; sid<this.surfaces.length; sid++) {
-					let surface = this.surfaces[sid]
-					let on_line = onSegment(surface.p1, projectile.nextCenter, surface.p2)
-					// console.log(son_line)
-					if (!on_line) continue
-					let cur_orient = orientation(surface.p1, surface.p2, projectile.nextCenter)
 					if (!this.projectile_orientations[sid]) this.projectile_orientations[sid] = {}
-					if (!this.projectile_orientations[sid][pid]) this.projectile_orientations[sid][pid] = cur_orient
+					let surface = this.surfaces[sid]
+					let pr = surface.projectionRatio(projectile.nextCenter)
+					let on_line = (pr>=0) && (pr<=1)
+					if (!on_line) {
+						// Reset current orientation
+						this.projectile_orientations[sid][pid] = undefined
+						continue
+					}
 
+					let cur_orient = orientation(surface.p1, surface.p2, projectile.nextCenter)
+					if (!this.projectile_orientations[sid][pid]) this.projectile_orientations[sid][pid] = cur_orient
 					if(this.projectile_orientations[sid][pid]===cur_orient) continue
 
 					let travel_path = new LineSegmentLite(projectile.center, projectile.nextCenter)
@@ -226,22 +239,6 @@ class Obstacle {
 					this._didCollideEvent(surface, projectile)
 
 				}
-				// console.log(
-				// 	surface.perpendicularDistance(projectile.nextCenter),
-				// )
-				// this.surfaces.forEach(surface=> {
-				// 	if (surface.passesBetween(projectile.center, projectile.nextCenter)) {
-				// 		let travel_path = new LineSegmentLite(projectile.center, projectile.nextCenter)
-				// 		projectile.nextCenter = travel_path.intersectionPoint(surface)
-				// 		projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
-				// 		// mutate the velocity vector
-				// 		projectile.velocity.tilt(surface.angle)
-				// 		projectile.velocity.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
-				// 		projectile.velocity.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
-				// 		projectile.velocity.tilt(-1*surface.angle)
-				// 		this._didCollideEvent(surface, projectile)
-				// 	}
-				// })
 			}
 		}
 	}
@@ -459,7 +456,7 @@ class Paddle extends Obstacle {
 				if (
 					this.surfaces[i].passesBetween(fake_trailing_center, projectile.nextCenter)
 					//  && this._surfaceMovingTowards(this.surfaces[i], fake_trailing_center)
-					&& !this.surface_debounce[i]
+					// && !this.surface_debounce[i]
 					) {
 					console.log("COLLISION!!!!!")
 					let fake_trailing_path = new LineSegmentLite(fake_trailing_center, projectile.nextCenter)

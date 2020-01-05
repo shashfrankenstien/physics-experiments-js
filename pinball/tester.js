@@ -70,8 +70,8 @@ var container = new Obstacle([
 	{fill:false}
 )
 
-o1.addEventListener('collision', (surface, projectile)=>{
-	// console.clear()
+container.addEventListener('collision', (surface, projectile)=>{
+	console.clear()
 	console.log("Bang!!")
 	console.log(projectile.velocity)
 	console.log(surface.angle)
