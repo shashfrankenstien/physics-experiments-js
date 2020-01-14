@@ -144,6 +144,10 @@ class LineSegment extends LineSegmentLite {
 		// projection ratio is between 0 and 1 if projection is within segment
 		return ((p.x - this.p1.x) * this._xdelta + (p.y - this.p1.y) * this._ydelta) / this.len2
 	}
+
+	pointOrientation(p) {
+		return orientation(this.p1, this.p2, p)
+	}
 }
 
 
@@ -184,7 +188,7 @@ class Obstacle {
 	}
 
 
-	_didCollideEvent(surface, colliding_obj) {
+	_emitCollisionEvent(surface, colliding_obj) {
 		if (this.event_listeners['collision']) [
 			this.event_listeners['collision'](surface, colliding_obj)
 		]
@@ -224,10 +228,11 @@ class Obstacle {
 						continue
 					}
 
-					let cur_orient = orientation(surface.p1, surface.p2, projectile.nextCenter)
+					let cur_orient = surface.pointOrientation(projectile.nextCenter)
 					if (!this.projectile_orientations[sid][pid]) this.projectile_orientations[sid][pid] = cur_orient
-					if(this.projectile_orientations[sid][pid]===cur_orient) continue
+					if(this.projectile_orientations[sid][pid]===cur_orient) continue // detect change in orientation
 
+					// If orientation did change
 					let travel_path = new LineSegmentLite(projectile.center, projectile.nextCenter)
 					projectile.nextCenter = travel_path.intersectionPoint(surface)
 					projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
@@ -236,7 +241,7 @@ class Obstacle {
 					projectile.velocity.y_component *= (-1 * this.options.bounce) // reverse perpendicular component * bounce factor
 					projectile.velocity.x_component *= (1 - this.options.resistance) // drop x velocity by resistance
 					projectile.velocity.tilt(-1*surface.angle)
-					this._didCollideEvent(surface, projectile)
+					this._emitCollisionEvent(surface, projectile)
 
 				}
 			}
@@ -433,7 +438,7 @@ class Paddle extends Obstacle {
 		const new_surfaces = this._computeNewSurfaces()
 		let did_move = false
 		for (let i=0;i<new_surfaces.length;i++){
-			if(new_surfaces[i].inclinationFrom(this.surfaces[i])) {
+			if(new_surfaces[i].inclinationFrom(this.surfaces[i])!==0) {
 				did_move = true
 				break
 			}
