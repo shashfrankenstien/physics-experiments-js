@@ -121,12 +121,6 @@ class LineSegmentLite {
 		const rel_slope = Math.abs((other.slope-this.slope) / (1+(other.slope*this.slope)))
 		return Math.atan(rel_slope) // in radians
 	}
-
-	perpendicularDistance(p) {
-		// tan θ = ∣m2−m1/1+m1m2∣
-		const l_p2 = new LineSegment(p, this.p2)
-		return l_p2.len * Math.sin(this.inclinationFrom(l_p2))
-	}
 }
 
 
@@ -138,6 +132,12 @@ class LineSegment extends LineSegmentLite {
 		this.len2 = this.p1.distance2From(this.p2)
 		this.len = Math.sqrt(this.len2)
 		this.angle = radiansToDeg(Math.atan(this.slope)) // angle of inclination (-90 to 90)
+	}
+
+	perpendicularDistance(p) {
+		// tan θ = ∣m2−m1/1+m1m2∣
+		const l_p2 = new LineSegment(p, this.p2)
+		return l_p2.len * Math.sin(this.inclinationFrom(l_p2))
 	}
 
 	projectionRatio(p) {
@@ -165,7 +165,6 @@ class Obstacle {
 			fillColor: options.fillColor || 'white',
 		}
 		this.surfaces = this._createSurfaces()
-		this.projectile_orientations = {}
 		this.event_listeners = {}
 	}
 
@@ -218,19 +217,16 @@ class Obstacle {
 			let projectile = props[pid]
 			if (projectile instanceof Projectile) {
 				for (let sid=0; sid<this.surfaces.length; sid++) {
-					if (!this.projectile_orientations[sid]) this.projectile_orientations[sid] = {}
 					let surface = this.surfaces[sid]
 					let pr = surface.projectionRatio(projectile.nextCenter)
 					let on_line = (pr>=0) && (pr<=1)
 					if (!on_line) {
-						// Reset current orientation
-						this.projectile_orientations[sid][pid] = undefined
 						continue
 					}
 
+					let prev_orient = surface.pointOrientation(projectile.center)
 					let cur_orient = surface.pointOrientation(projectile.nextCenter)
-					if (!this.projectile_orientations[sid][pid]) this.projectile_orientations[sid][pid] = cur_orient
-					if(this.projectile_orientations[sid][pid]===cur_orient) continue // detect change in orientation
+					if(prev_orient===cur_orient) continue // detect change in orientation
 
 					// If orientation did change
 					let travel_path = new LineSegmentLite(projectile.center, projectile.nextCenter)
@@ -339,7 +335,6 @@ class Paddle extends Obstacle {
 		window.addEventListener("keyup", ev=>this._handleKeyPress(ev))
 
 		this.timestamp = null
-		this.surface_debounce = []
 	}
 
 	_handleKeyPress(event) {
@@ -417,7 +412,6 @@ class Paddle extends Obstacle {
 			let x = this.pivot_point.x + (l.len * Math.cos(angleRad))
 			let y = this.pivot_point.y + (l.len * Math.sin(angleRad))
 			this.points[i] = new Point(x, y)
-			// console.log(timedelta)
 			// throw new Error("Pause!")
 		}
 		this.timestamp = newstamp
@@ -449,46 +443,58 @@ class Paddle extends Obstacle {
 		}
 
 		// did move
-		this.surfaces = new_surfaces
 		props.forEach(projectile=>{
 			const travel_path = new LineSegment(projectile.center, projectile.nextCenter)
 			for (let i=0; i<this.surfaces.length; i++) {
-				const fake_trailing_center = projectile.backupNextCenterBy(travel_path.len*2, travel_path)
-				// console.log(this._surfaceMovingTowards(prev_surfaces[i], fake_trailing_center),
-				// this._surfaceMovingTowards(this.surfaces[i], fake_trailing_center),
-				// this.pivot_point.distanceFrom(projectile.nextCenter)<=this.surfaces[i].len)
-				console.log(this.surface_debounce[i])
+
+				let pr = new_surfaces[i].projectionRatio(projectile.nextCenter)
+				let on_line = (pr>=0) && (pr<=1)
+				if (!on_line) {
+					continue
+				}
+
+				let proj_prev_orient = new_surfaces[i].pointOrientation(projectile.center)
+				let proj_new_orient = new_surfaces[i].pointOrientation(projectile.nextCenter)
+
+				let surf_prev_orient = this.surfaces[i].pointOrientation(projectile.nextCenter)
+				let surf_new_orient = new_surfaces[i].pointOrientation(projectile.nextCenter)
+
 				if (
-					this.surfaces[i].passesBetween(fake_trailing_center, projectile.nextCenter)
-					//  && this._surfaceMovingTowards(this.surfaces[i], fake_trailing_center)
-					// && !this.surface_debounce[i]
+					surf_new_orient !== surf_prev_orient
+					|| proj_new_orient !== proj_prev_orient
 					) {
 					console.log("COLLISION!!!!!")
-					let fake_trailing_path = new LineSegmentLite(fake_trailing_center, projectile.nextCenter)
-					let collision_point = fake_trailing_path.intersectionPoint(this.surfaces[i])
-					projectile.nextCenter = projectile.center.copy()
-					// projectile.nextCenter = fake_trailing_path.intersectionPoint(this.surfaces[i])
-					// projectile.nextCenter = projectile.backupNextCenterBy(0.1, travel_path)
+					let perp_dist_old = this.surfaces[i].perpendicularDistance(projectile.nextCenter)
+					let perp_dist_new = new_surfaces[i].perpendicularDistance(projectile.nextCenter)
+					let surf_offset_ratio = perp_dist_new / (perp_dist_new + perp_dist_old)
 
-					let omega = degToRadians(this.paddleSpeed * this.direction )
+					let travel_path = new LineSegment(projectile.center, projectile.nextCenter)
+					let collision_point = projectile.backupNextCenterBy(travel_path.len*surf_offset_ratio, travel_path)
+					projectile.nextCenter = collision_point
+
+					let omega = degToRadians( this.paddleSpeed * this.direction ) // angular velocity
 					let radiusLine = new LineSegment(this.pivot_point, collision_point)
-					let v = new VelocityVector(omega*radiusLine.len, 0)
-					console.log(projectile.velocity)
-					console.log(v)
-
-					let tilt_angle = (90-radiusLine.angle) //* (radiusLine.angle<0 ? -1: 1)
+					let v = new VelocityVector(omega*radiusLine.len, 0) // angular velocity for radius
+					let tilt_angle = (90-radiusLine.angle)
 					v.tilt(tilt_angle)
-					console.log(v)
-					projectile.velocity.x_component += v.x_component * this.anticlockwise_modifier
-					projectile.velocity.y_component += v.y_component * this.anticlockwise_modifier
-					console.log(projectile.velocity, radiusLine.angle, tilt_angle, omega)
-					this.surface_debounce[i] = true
+
+					// console.log(projectile.velocity)
+					// console.log('v', v)
+
+					let new_vx = projectile.velocity.x_component + v.x_component * this.anticlockwise_modifier
+					let new_vy = projectile.velocity.y_component + v.y_component * this.anticlockwise_modifier
+					projectile.velocity.x_component = median([projectile.velocity.x_component, v.x_component*this.anticlockwise_modifier, new_vx])
+					projectile.velocity.y_component = median([projectile.velocity.y_component, v.y_component*this.anticlockwise_modifier, new_vy])
+
+					// console.log(projectile.velocity)
+					// console.log('radiusLine.angle', radiusLine.angle)
+					// console.log('tilt_angle', tilt_angle)
+					// console.log('omega', omega)
 					// throw new Error("Pause")
-				} else {
-					this.surface_debounce[i] = false
 				}
 			}
 		})
+		this.surfaces = new_surfaces
 		super._paintCanvas(canvas)
 	}
 }

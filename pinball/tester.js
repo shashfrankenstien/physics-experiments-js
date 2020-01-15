@@ -70,13 +70,13 @@ var container = new Obstacle([
 	{fill:false}
 )
 
-container.addEventListener('collision', (surface, projectile)=>{
-	console.clear()
-	console.log("Bang!!")
-	console.log(projectile.velocity)
-	console.log(surface.angle)
-	// throw new Error("Pause")
-})
+// o2.addEventListener('collision', (surface, projectile)=>{
+// 	console.clear()
+// 	console.log("Bang!!")
+// 	console.log(projectile.velocity)
+// 	console.log(surface.angle)
+// 	throw new Error("Pause")
+// })
 
 
 var e = new Environment()
@@ -88,7 +88,7 @@ e.addObstacle(o4)
 e.draw()
 
 
-e.addProjectile(new Projectile(new Point(105, window.innerHeight-500), "red", new VelocityVector(0,-200)))
+e.addProjectile(new Projectile(new Point(window.innerWidth-105, window.innerHeight-500), "red", new VelocityVector(0,-200)))
 e.runloop()
 
 // function start(evnt) {
@@ -99,3 +99,59 @@ e.runloop()
 
 // window.addEventListener('click', start)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// COLLISION!!!!! engine.js:477:14
+// Object { x_component: -319.1807591885485, y_component: 527.3265863638965, mass: 1 }
+// engine.js:495:14
+// v
+// Object { x_component: 2586.605197152281, y_component: 0, mass: 1 }
+// engine.js:496:14
+// v
+// Object { x_component: -69.90764133165465, y_component: -2585.6603349277407, mass: 1 }
+// engine.js:500:14
+// Object { x_component: -389.08840052020315, y_component: -2058.333748563844, mass: 1 }
+// engine.js:503:14
+// radiusLine.angle -1.548709711378596 engine.js:504:14
+// tilt_angle 91.54870971137859 engine.js:505:14
+// omega 10.471975511965978 engine.js:506:14
+// COLLISION!!!!! engine.js:477:14
+// Object { x_component: -389.08840052020315, y_component: -2042.637748563844, mass: 1 }
+// engine.js:495:14
+// v
+// Object { x_component: 2605.7740790162484, y_component: 0, mass: 1 }
+// engine.js:496:14
+// v
+// Object { x_component: 34.48740383993623, y_component: -2605.545848732921, mass: 1 }
+// engine.js:500:14
+// Object { x_component: -354.6009966802669, y_component: -4648.183597296766, mass: 1 }
+// engine.js:503:14
+// radiusLine.angle 0.7583314279008283 engine.js:504:14
+// tilt_angle 89.24166857209917 engine.js:505:14
+// omega 10.471975511965978 engine.js:506:14
+// COLLISION!!!!! engine.js:477:14
+// Object { x_component: -354.6009966802669, y_component: -4631.506597296766, mass: 1 }
+// engine.js:495:14
+// v
+// Object { x_component: 2682.519518722113, y_component: 0, mass: 1 }
+// engine.js:496:14
+// v
+// Object { x_component: 478.33371937639623, y_component: -2639.527954243459, mass: 1 }
+// engine.js:500:14
+// Object { x_component: 123.73272269612931, y_component: -7271.034551540225, mass: 1 }
+// engine.js:503:14
+// radiusLine.angle 10.271634139236006 engine.js:504:14
+// tilt_angle 79.728365860764 engine.js:505:14
+// omega 10.471975511965978

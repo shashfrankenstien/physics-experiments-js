@@ -65,6 +65,13 @@ function radiansToDeg(rad) {
 
 
 
+function median(arr) {
+	console.log(arr)
+	let nums = arr.sort(function(a, b){return a - b;}); // make a deep copy and sort it
+	return nums[Math.floor(arr.length / 2)]; // for one item, i = 0; two items, i = 1; 3 items, i = 1...
+}
+
+
 // Intersection test
 
 function onSegment(p, q, r) {
@@ -138,3 +145,5 @@ function doIntersect(p1, q1, p2, q2) {
 // 	return dist2(p, { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) });
 // }
 // function distToSegment(v, w, p) { return Math.sqrt(distToSegmentSquared(v, w, p)); }
+
+
