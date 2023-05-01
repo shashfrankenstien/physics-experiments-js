@@ -10,6 +10,6 @@
   "author": "Shashank Gopikrishna",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^15.5.5"
+    "electron": "^24.1.3"
   }
 }
